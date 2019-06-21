@@ -4,9 +4,6 @@
 [submodule "thirdparty/vtk"]
 	path = thirdparty/vtk
 	url = https://github.com/Kitware/VTK
-[submodule "thirdparty/hdf5"]
-	path = thirdparty/hdf5
-	url = https://github.com/live-clones/hdf5
 [submodule "thirdparty/sedifoam"]
 	path = thirdparty/sedifoam
 	url = https://github.com/xiaoh/sediFoam
@@ -16,3 +13,6 @@
 [submodule "thirdparty/openfoam/thirdparty"]
 	path = thirdparty/openfoam/thirdparty
 	url = https://github.com/OpenFOAM/ThirdParty-6
+[submodule "thirdparty/hdf5"]
+	path = thirdparty/hdf5
+	url = https://github.com/live-clones/hdf5

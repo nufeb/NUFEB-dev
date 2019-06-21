@@ -3,25 +3,28 @@
 *.lo
 *.o
 *.obj
-*.ko
-*.elf
-*.orig
 *~
-code/lammps1Feb2014/src/Obj_serial/
-code/lammps1Feb2014/src/Obj_serial_debug/
-code/lammps1Feb2014/src/Obj_mpi/
-code/lammps1Feb2014/src/Obj_mpi_debug/
 
-#inputscript dir
-code/input/*
-code/inputs/*
-!code/input/examples/
-code/post_processing/snapshot.bubblemd
-code/post_processing/0_images/*
-!code/post_processing/
-code/nufebFoam/cases/*
+# Precompiled Headers
+*.gch
+*.pch
 
-# Ouput files
-*.vtu
-*.pvtu
-*.vtr
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
