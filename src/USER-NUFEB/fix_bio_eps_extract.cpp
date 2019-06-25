@@ -209,16 +209,17 @@ void FixEPSExtract::post_integrate() {
         double thetad = random->uniform() * 2 * MY_PI;
         double phid = random->uniform() * (MY_PI);
 
-        double oldx = atom->x[i][0];
-        double oldy = atom->x[i][1];
-        double oldz = atom->x[i][2];
+        double old_x = atom->x[i][0];
+        double old_y = atom->x[i][1];
+        double old_z = atom->x[i][2];
 
         //create child
         double child_radius = pow(((6 * eps_mass) / (eps_density * MY_PI)), (1.0 / 3.0)) * 0.5;
         double* coord = new double[3];
-        double newx = oldx - ((child_radius + avec->outer_radius[i]) * cos(thetad) * sin(phid) * DELTA);
-        double newy = oldy - ((child_radius + avec->outer_radius[i]) * sin(thetad) * sin(phid) * DELTA);
-        double newz = oldz - ((child_radius + avec->outer_radius[i]) * cos(phid) * DELTA);
+        double newx = old_x - ((child_radius + avec->outer_radius[i]) * cos(thetad) * sin(phid) * DELTA);
+        double newy = old_y - ((child_radius + avec->outer_radius[i]) * sin(thetad) * sin(phid) * DELTA);
+        double newz = old_z - ((child_radius + avec->outer_radius[i]) * cos(phid) * DELTA);
+
         if (newx - child_radius < xlo) {
           newx = xlo + child_radius;
         } else if (newx + child_radius > xhi) {
@@ -256,6 +257,7 @@ void FixEPSExtract::post_integrate() {
         atom->omega[n][1] = atom->omega[i][1];
         atom->omega[n][2] = atom->omega[i][2];
         atom->rmass[n] = eps_mass;
+        avec->biomass[n] = eps_mass;
         avec->outer_mass[n] = 0;
 
         atom->torque[n][0] = atom->torque[i][0];

@@ -42,7 +42,7 @@ class DumpBio : public Dump {
 
   int anab_flag, nus_flag, avgnus_flag, cata_flag, ph_flag, mass_flag, gas_flag, yield_flag, avgph_flag;
   int dia_flag, dim_flag, div_flag, height_flag, rough_flag, seg_flag, ntypes_flag, bulk_flag;
-  int mass_header, div_header, type_header, bulk_header, avgnus_header, avgph_header;
+  int mass_header, div_header, type_header, bulk_header, avgnus_header, avgph_header, pres_flag;
 
   double xlo,xhi,ylo,yhi,zlo,zhi;
   double stepx, stepy, stepz;
@@ -64,7 +64,7 @@ class DumpBio : public Dump {
   class ComputeNufebAvgcon *cavgs;
   class ComputeNufebAvgph *cavgph;
   class ComputeNufebGas *cgas;
-
+  class ComputeNufebPressure *cpres;
 
   void openfile();
   void write();
@@ -87,6 +87,7 @@ class DumpBio : public Dump {
   void write_gas_data();
 
   void write_diameter_data();
+  void write_pressure_data();
   void write_dimension_data();
   void write_diversity_data();
   void write_height_data();

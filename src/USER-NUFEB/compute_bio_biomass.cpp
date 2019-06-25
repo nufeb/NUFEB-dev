@@ -16,6 +16,7 @@
 #include "pointers.h"
 #include "update.h"
 #include "memory.h"
+#include "atom_vec_bio.h"
 
 using namespace LAMMPS_NS;
 
@@ -26,6 +27,7 @@ ComputeNufebBiomass::ComputeNufebBiomass(LAMMPS *lmp, int narg, char **arg) :
 {
   if (narg != 3) error->all(FLERR,"Illegal compute biomass command");
 
+  avec = (AtomVecBio *) atom->style_match("bio");
   vector_flag = 1;
   extvector = 0;
   int ntypes = atom->ntypes;
@@ -46,7 +48,7 @@ void ComputeNufebBiomass::compute_vector()
 {
   invoked_vector = update->ntimestep;
 
-  double *rmass = atom->rmass;
+  double *biomass = avec->biomass;
   int *type = atom->type;
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
@@ -60,8 +62,8 @@ void ComputeNufebBiomass::compute_vector()
 
   for (int i = 0; i < nlocal; i++)
     if (mask[i] & groupbit) {
-      vector[type[i]] += rmass[i];
-      vector[0] += rmass[i];
+      vector[type[i]] += biomass[i];
+      vector[0] += biomass[i];
     }
 
   MPI_Allreduce(MPI_IN_PLACE, vector, ntypes + 1, MPI_DOUBLE, MPI_SUM, world);

@@ -42,15 +42,16 @@ AtomVecBio::AtomVecBio(LAMMPS *lmp) : AtomVec(lmp)
   size_reverse = 6;
   size_border = 10;
   size_velocity = 6;
-  size_data_atom = 5;
+  size_data_atom = 6;
   size_data_vel = 7;
   xcol_data = 5;
 
   atom->sphere_flag = 1;
   atom->radius_flag = atom->rmass_flag = atom->omega_flag = atom->torque_flag = 1;
 
-  outer_mass = memory->create(outer_mass,nmax,"atom:outerMass");
-  outer_radius = memory->create(outer_radius,nmax,"atom:outerRadius");;
+  outer_mass = memory->create(outer_mass,nmax,"atom:outer_mass");
+  outer_radius = memory->create(outer_radius,nmax,"atom:outer_radius");
+  biomass = memory->create(biomass,nmax,"atom:biomass");
   type_eps = 0;
   type_dead = 0;
   eps_mask = 0;
@@ -63,6 +64,7 @@ AtomVecBio::AtomVecBio(LAMMPS *lmp) : AtomVec(lmp)
   for (int i = 0; i < atom->nlocal; i++) {
     outer_radius[i] = 0;
     outer_mass[i] = 0;
+    biomass[i] = 0;
   }
 }
 
@@ -72,6 +74,7 @@ AtomVecBio::~AtomVecBio()
 {
   memory->destroy(outer_mass);
   memory->destroy(outer_radius);
+  memory->destroy(biomass);
 
   delete bio;
 }
@@ -84,8 +87,9 @@ void AtomVecBio::init()
   set_group_mask();
 
   for (int i = 0; i < atom->nlocal; i++) {
-    outer_radius[i] = atom->radius[i];
-    outer_mass[i] = atom->rmass[i];
+    if(!outer_radius[i]) outer_radius[i] = atom->radius[i];
+    if(!outer_mass[i]) outer_mass[i] = atom->rmass[i];
+    if(!biomass[i]) biomass[i] = atom->rmass[i] * 0.25;
   }
 }
 
@@ -113,8 +117,9 @@ void AtomVecBio::grow(int n)
 
   radius = memory->grow(atom->radius,nmax,"atom:radius");
   rmass = memory->grow(atom->rmass,nmax,"atom:rmass");
-  outer_mass = memory->grow(outer_mass,nmax,"atom:outerMass");
-  outer_radius = memory->grow(outer_radius,nmax,"atom:outerRadius");
+  biomass = memory->grow(atom->rmass,nmax,"atom:biomass");
+  outer_mass = memory->grow(outer_mass,nmax,"atom:outer_mass");
+  outer_radius = memory->grow(outer_radius,nmax,"atom:outer_radius");
   omega = memory->grow(atom->omega,nmax,3,"atom:omega");
   torque = memory->grow(atom->torque,nmax*comm->nthreads,3,"atom:torque");
 
@@ -156,6 +161,7 @@ void AtomVecBio::copy(int i, int j, int delflag)
   radius[j] = radius[i];
   rmass[j] = rmass[i];
   outer_radius[j] = outer_radius[i];
+  biomass[j] = biomass[i];
   outer_mass[j] = outer_mass[i];
   omega[j][0] = omega[i][0];
   omega[j][1] = omega[i][1];
@@ -185,6 +191,7 @@ int AtomVecBio::pack_comm(int n, int *list, double *buf,
       buf[m++] = rmass[j];
       buf[m++] = outer_radius[j];
       buf[m++] = outer_mass[j];
+      buf[m++] = biomass[j];
     }
   } else {
     if (domain->triclinic == 0) {
@@ -205,6 +212,7 @@ int AtomVecBio::pack_comm(int n, int *list, double *buf,
       buf[m++] = rmass[j];
       buf[m++] = outer_radius[j];
       buf[m++] = outer_mass[j];
+      buf[m++] = biomass[j];
     }
   }
 
@@ -230,6 +238,7 @@ int AtomVecBio::pack_comm_vel(int n, int *list, double *buf,
       buf[m++] = rmass[j];
       buf[m++] = outer_radius[j];
       buf[m++] = outer_mass[j];
+      buf[m++] = biomass[j];
       buf[m++] = v[j][0];
       buf[m++] = v[j][1];
       buf[m++] = v[j][2];
@@ -257,6 +266,7 @@ int AtomVecBio::pack_comm_vel(int n, int *list, double *buf,
 	buf[m++] = rmass[j];
 	buf[m++] = outer_radius[j];
 	buf[m++] = outer_mass[j];
+	buf[m++] = biomass[j];
 	buf[m++] = v[j][0];
 	buf[m++] = v[j][1];
 	buf[m++] = v[j][2];
@@ -277,6 +287,7 @@ int AtomVecBio::pack_comm_vel(int n, int *list, double *buf,
 	buf[m++] = rmass[j];
 	buf[m++] = outer_radius[j];
 	buf[m++] = outer_mass[j];
+	buf[m++] = biomass[j];
 	if (mask[i] & deform_groupbit) {
 	  buf[m++] = v[j][0] + dvx;
 	  buf[m++] = v[j][1] + dvy;
@@ -309,6 +320,7 @@ int AtomVecBio::pack_comm_hybrid(int n, int *list, double *buf)
     buf[m++] = rmass[j];
     buf[m++] = outer_radius[j];
     buf[m++] = outer_mass[j];
+    buf[m++] = biomass[j];
   }
   return m;
 }
@@ -329,6 +341,7 @@ void AtomVecBio::unpack_comm(int n, int first, double *buf)
     rmass[i] = buf[m++];
     outer_radius[i] = buf[m++];
     outer_mass[i] = buf[m++];
+    biomass[i] = buf[m++];
   }
 }
 
@@ -348,6 +361,7 @@ void AtomVecBio::unpack_comm_vel(int n, int first, double *buf)
     rmass[i] = buf[m++];
     outer_radius[i] = buf[m++];
     outer_mass[i] = buf[m++];
+    biomass[i] = buf[m++];
     v[i][0] = buf[m++];
     v[i][1] = buf[m++];
     v[i][2] = buf[m++];
@@ -370,6 +384,7 @@ int AtomVecBio::unpack_comm_hybrid(int n, int first, double *buf)
     rmass[i] = buf[m++];
     outer_radius[i] = buf[m++];
     outer_mass[i] = buf[m++];
+    biomass[i] = buf[m++];
   }
   return m;
 }
@@ -465,6 +480,7 @@ int AtomVecBio::pack_border(int n, int *list, double *buf,
       buf[m++] = rmass[j];
       buf[m++] = outer_radius[j];
       buf[m++] = outer_mass[j];
+      buf[m++] = biomass[j];
     }
   } else {
     if (domain->triclinic == 0) {
@@ -488,6 +504,7 @@ int AtomVecBio::pack_border(int n, int *list, double *buf,
       buf[m++] = rmass[j];
       buf[m++] = outer_radius[j];
       buf[m++] = outer_mass[j];
+      buf[m++] = biomass[j];
     }
   }
 
@@ -520,6 +537,7 @@ int AtomVecBio::pack_border_vel(int n, int *list, double *buf,
       buf[m++] = rmass[j];
       buf[m++] = outer_radius[j];
       buf[m++] = outer_mass[j];
+      buf[m++] = biomass[j];
       buf[m++] = v[j][0];
       buf[m++] = v[j][1];
       buf[m++] = v[j][2];
@@ -548,8 +566,9 @@ int AtomVecBio::pack_border_vel(int n, int *list, double *buf,
         buf[m++] = ubuf(mask[j]).d;
         buf[m++] = radius[j];
         buf[m++] = rmass[j];
-	buf[m++] = outer_radius[j];
-	buf[m++] = outer_mass[j];
+        buf[m++] = outer_radius[j];
+        buf[m++] = outer_mass[j];
+        buf[m++] = biomass[j];
         buf[m++] = v[j][0];
         buf[m++] = v[j][1];
         buf[m++] = v[j][2];
@@ -571,8 +590,9 @@ int AtomVecBio::pack_border_vel(int n, int *list, double *buf,
         buf[m++] = ubuf(mask[j]).d;
         buf[m++] = radius[j];
         buf[m++] = rmass[j];
-	buf[m++] = outer_radius[j];
-	buf[m++] = outer_mass[j];
+        buf[m++] = outer_radius[j];
+        buf[m++] = outer_mass[j];
+        buf[m++] = biomass[j];
         if (mask[i] & deform_groupbit) {
           buf[m++] = v[j][0] + dvx;
           buf[m++] = v[j][1] + dvy;
@@ -609,6 +629,7 @@ int AtomVecBio::pack_border_hybrid(int n, int *list, double *buf)
     buf[m++] = rmass[j];
     buf[m++] = outer_radius[j];
     buf[m++] = outer_mass[j];
+    buf[m++] = biomass[j];
   }
   return m;
 }
@@ -633,6 +654,7 @@ void AtomVecBio::unpack_border(int n, int first, double *buf)
     rmass[i] = buf[m++];
     outer_radius[i] = buf[m++];
     outer_mass[i] = buf[m++];
+    biomass[i] = buf[m++];
   }
 
   if (atom->nextra_border)
@@ -662,6 +684,7 @@ void AtomVecBio::unpack_border_vel(int n, int first, double *buf)
     rmass[i] = buf[m++];
     outer_radius[i] = buf[m++];
     outer_mass[i] = buf[m++];
+    biomass[i] = buf[m++];
     v[i][0] = buf[m++];
     v[i][1] = buf[m++];
     v[i][2] = buf[m++];
@@ -689,6 +712,7 @@ int AtomVecBio::unpack_border_hybrid(int n, int first, double *buf)
     rmass[i] = buf[m++];
     outer_radius[i] = buf[m++];
     outer_mass[i] = buf[m++];
+    biomass[i] = buf[m++];
   }
   return m;
 }
@@ -716,6 +740,7 @@ int AtomVecBio::pack_exchange(int i, double *buf)
   buf[m++] = rmass[i];
   buf[m++] = outer_radius[i];
   buf[m++] = outer_mass[i];
+  buf[m++] = biomass[i];
   buf[m++] = omega[i][0];
   buf[m++] = omega[i][1];
   buf[m++] = omega[i][2];
@@ -751,6 +776,7 @@ int AtomVecBio::unpack_exchange(double *buf)
   rmass[nlocal] = buf[m++];
   outer_radius[nlocal] = buf[m++];
   outer_mass[nlocal] = buf[m++];
+  biomass[nlocal] = buf[m++];
   omega[nlocal][0] = buf[m++];
   omega[nlocal][1] = buf[m++];
   omega[nlocal][2] = buf[m++];
@@ -808,6 +834,7 @@ int AtomVecBio::pack_restart(int i, double *buf)
   buf[m++] = rmass[i];
   buf[m++] = outer_radius[i];
   buf[m++] = outer_mass[i];
+  buf[m++] = biomass[i];
   buf[m++] = omega[i][0];
   buf[m++] = omega[i][1];
   buf[m++] = omega[i][2];
@@ -849,6 +876,7 @@ int AtomVecBio::unpack_restart(double *buf)
   rmass[nlocal] = buf[m++];
   outer_radius[nlocal] = buf[m++];
   outer_mass[nlocal] = buf[m++];
+  biomass[nlocal] = buf[m++];
   omega[nlocal][0] = buf[m++];
   omega[nlocal][1] = buf[m++];
   omega[nlocal][2] = buf[m++];
@@ -893,6 +921,7 @@ void AtomVecBio::create_atom(int itype, double *coord)
 
   outer_radius[nlocal] = radius[nlocal];
   outer_mass[nlocal] = rmass[nlocal];
+  biomass[nlocal] = rmass[nlocal] * 0.25;
 
   atom->nlocal++;
 }
@@ -943,9 +972,13 @@ void AtomVecBio::data_atom(double *coord, imageint imagetmp, char **values)
   if (outer_radius[nlocal] < radius[nlocal]) {
     error->one(FLERR,"Outer radius must be greater than or equal to radius");
   }
+
   outer_mass[nlocal] = (4.0*MY_PI/3.0)*
     ((outer_radius[nlocal]*outer_radius[nlocal]*outer_radius[nlocal])
      -(radius[nlocal]*radius[nlocal]*radius[nlocal])) * 30;
+
+  biomass[nlocal] = 4.0*MY_PI/3.0 *
+    atom->radius[nlocal]*atom->radius[nlocal]*atom->radius[nlocal] * atof(values[8]);
 
   atom->nlocal++;
 }
@@ -1131,8 +1164,9 @@ bigint AtomVecBio::memory_usage()
 
   if (atom->memcheck("radius")) bytes += memory->usage(radius,nmax);
   if (atom->memcheck("rmass")) bytes += memory->usage(rmass,nmax);
-  if (atom->memcheck("outerMass")) bytes += memory->usage(outer_mass,nmax);
-  if (atom->memcheck("outerRadius")) bytes += memory->usage(outer_radius,nmax);
+  if (atom->memcheck("outer_mass")) bytes += memory->usage(outer_mass,nmax);
+  if (atom->memcheck("outer_radius")) bytes += memory->usage(outer_radius,nmax);
+  if (atom->memcheck("biomass")) bytes += memory->usage(biomass,nmax);
   if (atom->memcheck("omega")) bytes += memory->usage(omega,nmax,3);
   if (atom->memcheck("torque"))
     bytes += memory->usage(torque,nmax*comm->nthreads,3);

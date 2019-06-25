@@ -163,7 +163,7 @@ void FixVerify::nitrogen_mass_balance() {
   // get biomass concentration (mol/L)
   for (int i = 0; i < nlocal; i++) {
     int pos = kinetics->position(i);
-    double rmassCellVol = atom->rmass[i] / vol;
+    double rmassCellVol = avec->biomass[i] / vol;
     rmassCellVol /= 24.6;
 
     if (pos != -1) smass += rmassCellVol;
@@ -220,7 +220,7 @@ void FixVerify::benchmark_one() {
   double maxz = 0;
 
   for (int i = 0; i < nlocal; i++) {
-    tmass += atom->rmass[i];
+	tmass += avec->biomass[i];
     if (atom->x[i][2] > maxz) maxz = atom->x[i][2];
   }
   MPI_Allreduce(&tmass,&global_tmass,1,MPI_DOUBLE,MPI_SUM,world);
@@ -285,7 +285,7 @@ void FixVerify::benchmark_three() {
   double maxz = 0;
 
   for (int i = 0; i < nlocal; i++) {
-    tmass += atom->rmass[i];
+    tmass += avec->biomass[i];
     if (atom->x[i][2]+atom->radius[i] > maxz) maxz = atom->x[i][2]+atom->radius[i];
   }
   MPI_Allreduce(&tmass,&global_tmass,1,MPI_DOUBLE,MPI_SUM,world);

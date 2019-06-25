@@ -1,0 +1,261 @@
+LAMMPS (5 Nov 2016)
+# NUFEB simulation
+
+units si
+atom_style	bio
+atom_modify	map array sort 1000 5.0e-7
+boundary	pp pp ff
+newton		off
+processors * * 1
+
+comm_modify	vel yes
+read_data_bio atom.in
+  orthogonal box = (0 0 0) to (0.0001 0.0001 0.0001)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  0 atoms
+  5 nutrients
+
+##############Define initial particle distribution##############
+
+lattice sc 1e-6 origin 0 0 0
+Lattice spacing in x,y,z = 1e-06 1e-06 1e-06
+region reg block 0 100 0 100 0 1
+
+create_atoms 1 random 100 3124 reg
+Created 100 atoms
+create_atoms 2 random 100 1321 reg
+Created 100 atoms
+create_atoms 3 random 100 52342 reg
+Created 100 atoms
+create_atoms 4 random 1 13212 reg
+Created 1 atoms
+create_atoms 5 random 1 41231 reg
+Created 1 atoms
+
+set type 1 density 32
+  100 settings made for density
+set type 1 diameter 1.3e-6
+  100 settings made for diameter
+set type 1 mass 3.68e-17
+  100 settings made for mass
+bio/set type 1 biomass 10
+  100 settings made for biomass
+
+set type 2 density 32
+  100 settings made for density
+set type 2 diameter 1.3e-6
+  100 settings made for diameter
+set type 2 mass 3.68e-17
+  100 settings made for mass
+bio/set type 2 biomass 10
+  100 settings made for biomass
+
+set type 3 density 32
+  100 settings made for density
+set type 3 diameter 1.3e-6
+  100 settings made for diameter
+set type 3 mass 3.68e-17
+  100 settings made for mass
+bio/set type 3 biomass 10
+  100 settings made for biomass
+
+set type 4 density 32
+  1 settings made for density
+set type 4 diameter 1.3e-6
+  1 settings made for diameter
+set type 4 mass 3.68e-17
+  1 settings made for mass
+
+set type 5 density 32
+  1 settings made for density
+set type 5 diameter 1.3e-6
+  1 settings made for diameter
+set type 5 mass 3.68e-17
+  1 settings made for mass
+
+group HET type 1
+100 atoms in group HET
+group AOB type 2
+100 atoms in group AOB
+group NOB type 3
+100 atoms in group NOB
+group EPS type 4
+1 atoms in group EPS
+group DEAD type 5
+1 atoms in group DEAD
+
+neighbor        5e-7 bin
+neigh_modify    delay 0 one 5000
+
+
+##############Define DEM Variables&Commands##############
+
+pair_style  gran/hooke/history 1e-4 NULL 1e-4 NULL 0 1
+pair_coeff  * *
+
+timestep 1e-3
+
+fix 1 all nve/limit 1e-8
+fix fv all viscous 1e-8
+
+fix zw all wall/gran hooke/history 1e-4 NULL 1e-4 NULL 0 1 zplane 0.0e-4 2e-04
+
+variable kanc equal 5e+8
+
+fix zwa all walladh v_kanc zplane  0.0 2e-04
+
+variable ke equal 5e+8
+#fix j1 all epsadh 1 v_ke 1
+
+##############Define IBm Variables##############
+
+#variables used in fix eps_extract
+variable EPSdens equal 30
+variable EPSratio equal 1.10
+
+#variables used in fix division
+variable divDia equal 1.36e-6
+
+#variables used in fix kinetics
+variable diffT equal 1e-4
+variable tol equal 5e-7
+variable etaHET equal 0.6
+variable layer equal 2e-5
+
+#variables used in fix death
+variable deadDia equal 5e-7
+
+##############Define IBm Commands##############
+
+fix k1 all kinetics 1 25 25 25 v_diffT v_layer niter 500
+fix kgm all kinetics/growth/monod v_EPSdens v_etaHET
+fix g1 all kinetics/diffusion v_tol pp pp nd kg bulk 2.31e-7 1.25e-3 0.1
+fix d1 all divide 1 v_EPSdens v_divDia 41341 demflag 0
+fix e1 HET eps_extract 1 v_EPSratio v_EPSdens 5234 demflag 0
+fix d2 all death 1 v_deadDia demflag 0
+
+##############Define IBm Computes##############
+
+compute myNtypes all ntypes
+compute myMass all biomass
+compute myCon all avg_con
+compute myVol all nufeb/volume
+compute myPres all bio/pressure NULL pair vol v_vol
+
+##############Simulation Output##############
+thermo_style    custom step cpu atoms c_myNtypes[*] c_myPres
+#dump du0 all bio 300 pressure
+#dump du2 all grid 90030 grid_%_*.vti con
+#dump du3 all custom/vtk 90030 snapshot_*.vtu id type diameter x y z
+thermo 300
+thermo_modify   lost ignore
+
+##############Define Bio-loop and DEM-subloop##############
+
+run 14400 pre no post no every 1 "fix_modify k1 demflag 1" "fix_modify d2 demflag 1" "fix_modify d1 demflag 1" "fix_modify e1 demflag 1" "timestep 1e-3" "run 3000 pre no post no" "timestep 1200" "fix_modify k1 demflag 0" "fix_modify d2 demflag 0" "fix_modify d1 demflag 0" "fix_modify e1 demflag 0"
+Neighbor list info ...
+  2 neighbor list requests
+  update every 1 steps, delay 0 steps, check yes
+  max neighbors/atom: 5000, page size: 100000
+  master list distance cutoff = 1.8e-06
+  ghost atom cutoff = 1.8e-06
+  binsize = 9e-07 -> bins = 112 112 112
+Memory usage per processor = 13.5742 Mbytes
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] c_myNtypes[5] c_myNtypes[6] c_myPres 
+       0            0      302            0          100          100          100            1            1    0.4297994 
+number of iterations: 500 
+       1   0.44738102      302            0          100          100          100            1            1   0.42922526 
+Loop time of 0.447395 on 1 procs for 1 steps with 302 atoms
+
+99.7% CPU use with 1 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+fix_modify e1 demflag 1
+timestep 1e-3
+run 3000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] c_myNtypes[5] c_myNtypes[6] c_myPres 
+       1            0      302            0          100          100          100            1            1   0.42922526 
+     300  0.014065027      302            0          100          100          100            1            1  -0.13304417 
+     600  0.028627872      302            0          100          100          100            1            1  -0.13304417 
+     900  0.042764902      302            0          100          100          100            1            1  -0.13304417 
+    1200  0.065936089      302            0          100          100          100            1            1  -0.13304417 
+    1500  0.080853939      302            0          100          100          100            1            1  -0.13304417 
+    1800  0.094922066      302            0          100          100          100            1            1  -0.13304417 
+    2100   0.11851788      302            0          100          100          100            1            1  -0.13304417 
+    2400   0.13269305      302            0          100          100          100            1            1  -0.13304417 
+    2700   0.14648604      302            0          100          100          100            1            1  -0.13304417 
+    3000   0.16125703      302            0          100          100          100            1            1  -0.13304417 
+    3001   0.16129994      302            0          100          100          100            1            1   -0.1232661 
+Loop time of 0.161309 on 1 procs for 3000 steps with 302 atoms
+
+100.0% CPU use with 1 MPI tasks x no OpenMP threads
+timestep 1200
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+fix_modify e1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] c_myNtypes[5] c_myNtypes[6] c_myPres 
+    3001            0      302            0          100          100          100            1            1   -0.1232661 
+number of iterations: 500 
+    3002   0.46451306      302            0          100          100          100            1            1  -0.13352043 
+Loop time of 0.464525 on 1 procs for 1 steps with 302 atoms
+
+100.0% CPU use with 1 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+fix_modify e1 demflag 1
+timestep 1e-3
+run 3000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] c_myNtypes[5] c_myNtypes[6] c_myPres 
+    3002            0      302            0          100          100          100            1            1  -0.13352043 
+    3300  0.014028072      302            0          100          100          100            1            1  -0.13352043 
+    3600   0.02812314      302            0          100          100          100            1            1  -0.13352043 
+    3900  0.042512178      302            0          100          100          100            1            1  -0.13352043 
+    4200  0.064913034      302            0          100          100          100            1            1  -0.13352043 
+    4500  0.079370022      302            0          100          100          100            1            1  -0.13352043 
+    4800  0.093230009      302            0          100          100          100            1            1  -0.13352043 
+    5100   0.11579609      302            0          100          100          100            1            1  -0.13352043 
+    5400   0.13000202      302            0          100          100          100            1            1  -0.13352043 
+    5700   0.14379215      302            0          100          100          100            1            1  -0.13352043 
+    6000   0.15814209      302            0          100          100          100            1            1  -0.13352043 
+    6002   0.16766214      302            0          100          100          100            1            1  -0.13352043 
+Loop time of 0.167684 on 1 procs for 3000 steps with 302 atoms
+
+97.6% CPU use with 1 MPI tasks x no OpenMP threads
+timestep 1200
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+fix_modify e1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] c_myNtypes[5] c_myNtypes[6] c_myPres 
+    6002            0      302            0          100          100          100            1            1  -0.13352043 
+number of iterations: 500 
+    6003   0.92593503      302            0          100          100          100            1            1  -0.12333329 
+Loop time of 0.925947 on 1 procs for 1 steps with 302 atoms
+
+100.0% CPU use with 1 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+fix_modify e1 demflag 1
+timestep 1e-3
+run 3000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] c_myNtypes[5] c_myNtypes[6] c_myPres 
+    6003            0      302            0          100          100          100            1            1  -0.12333329 
+    6300  0.014086008      302            0          100          100          100            1            1  -0.29074308 
+    6600  0.028424025      302            0          100          100          100            1            1  -0.29074308 
+    6900  0.042366982      302            0          100          100          100            1            1  -0.29074308 
+    7200  0.065001011      302            0          100          100          100            1            1  -0.29074308 
+    7500   0.07894206      302            0          100          100          100            1            1  -0.29074308 
+    7800  0.092793941      302            0          100          100          100            1            1  -0.29074308 
+    8100   0.11489797      302            0          100          100          100            1            1  -0.29074308 
+    8400     0.129076      302            0          100          100          100            1            1  -0.29074308 
+    8700    0.1422689      302            0          100          100          100            1            1  -0.29074308 
+    9000   0.15637589      302            0          100          100          100            1            1  -0.29074308 
+    9003   0.15645885      302            0          100          100          100            1            1  -0.15751429 
+Loop time of 0.156468 on 1 procs for 3000 steps with 302 atoms
+
+100.0% CPU use with 1 MPI tasks x no OpenMP threads

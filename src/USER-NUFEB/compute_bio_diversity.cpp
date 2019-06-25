@@ -43,7 +43,6 @@ double ComputeNufebDiversity::compute_scalar()
 {
   invoked_scalar = update->ntimestep;
 
-  double *rmass = atom->rmass;
   int *type = atom->type;
   int *mask = atom->mask;
   int nlocal = atom->nlocal;

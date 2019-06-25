@@ -178,88 +178,97 @@ void FixDivide::post_integrate() {
       double density = atom->rmass[i] / (4.0 * MY_PI / 3.0 * atom->radius[i] * atom->radius[i] * atom->radius[i]);
 
       if (atom->radius[i] * 2 >= div_dia) {
-        double newX, newY, newZ;
+        double new_x, new_y, new_z;
 
-        double splitF = 0.4 + (random->uniform() * 0.2);
-        double parentMass = atom->rmass[i] * splitF;
-        double childMass = atom->rmass[i] - parentMass;
+        double split_factor = 0.4 + (random->uniform() * 0.2);
 
-        double parentOuterMass = avec->outer_mass[i] * splitF;
-        double childOuterMass = avec->outer_mass[i] - parentOuterMass;
+        double parent_mass = atom->rmass[i] * split_factor;
+        double child_mass = atom->rmass[i] - parent_mass;
 
-        double parentfx = atom->f[i][0] * splitF;
+        double parent_biomass = avec->biomass[i] * split_factor;
+        double child_biomass = avec->biomass[i] - parent_biomass;
+
+        double parent_outermass = avec->outer_mass[i] * split_factor;
+        double child_outermass = avec->outer_mass[i] - parent_outermass;
+
+        double parentfx = atom->f[i][0] * split_factor;
         double childfx = atom->f[i][0] - parentfx;
 
-        double parentfy = atom->f[i][1] * splitF;
+        double parentfy = atom->f[i][1] * split_factor;
         double childfy = atom->f[i][1] - parentfy;
 
-        double parentfz = atom->f[i][2] * splitF;
+        double parentfz = atom->f[i][2] * split_factor;
         double childfz = atom->f[i][2] - parentfz;
 
         double thetaD = random->uniform() * 2 * MY_PI;
         double phiD = random->uniform() * (MY_PI);
 
-        double oldX = atom->x[i][0];
-        double oldY = atom->x[i][1];
-        double oldZ = atom->x[i][2];
+        double old_x = atom->x[i][0];
+        double old_y = atom->x[i][1];
+        double old_z = atom->x[i][2];
 
         //double separation = radius[i] * 0.005;
 
         //Update parent
-        atom->rmass[i] = parentMass;
-        avec->outer_mass[i] = parentOuterMass;
+        atom->rmass[i] = parent_mass;
+        avec->outer_mass[i] = parent_outermass;
+        avec->biomass[i] = parent_biomass;
+
         atom->f[i][0] = parentfx;
         atom->f[i][1] = parentfy;
         atom->f[i][2] = parentfz;
+
         atom->radius[i] = pow(((6 * atom->rmass[i]) / (density * MY_PI)), (1.0 / 3.0)) * 0.5;
-        avec->outer_radius[i] = pow((3.0 / (4.0 * MY_PI)) * ((atom->rmass[i] / density) + (parentOuterMass / eps_density)), (1.0 / 3.0));
-        newX = oldX + (avec->outer_radius[i] * cos(thetaD) * sin(phiD) * DELTA);
-        newY = oldY + (avec->outer_radius[i] * sin(thetaD) * sin(phiD) * DELTA);
-        newZ = oldZ + (avec->outer_radius[i] * cos(phiD) * DELTA);
-        if (newX - avec->outer_radius[i] < xlo) {
-          newX = xlo + avec->outer_radius[i];
-        } else if (newX + avec->outer_radius[i] > xhi) {
-          newX = xhi - avec->outer_radius[i];
+        avec->outer_radius[i] = pow((3.0 / (4.0 * MY_PI)) * ((atom->rmass[i] / density) + (parent_outermass / eps_density)), (1.0 / 3.0));
+        new_x = old_x + (avec->outer_radius[i] * cos(thetaD) * sin(phiD) * DELTA);
+        new_y = old_y + (avec->outer_radius[i] * sin(thetaD) * sin(phiD) * DELTA);
+        new_z = old_z + (avec->outer_radius[i] * cos(phiD) * DELTA);
+        if (new_x - avec->outer_radius[i] < xlo) {
+          new_x = xlo + avec->outer_radius[i];
+        } else if (new_x + avec->outer_radius[i] > xhi) {
+          new_x = xhi - avec->outer_radius[i];
         }
-        if (newY - avec->outer_radius[i] < ylo) {
-          newY = ylo + avec->outer_radius[i];
-        } else if (newY + avec->outer_radius[i] > yhi) {
-          newY = yhi - avec->outer_radius[i];
+        if (new_y - avec->outer_radius[i] < ylo) {
+          new_y = ylo + avec->outer_radius[i];
+        } else if (new_y + avec->outer_radius[i] > yhi) {
+          new_y = yhi - avec->outer_radius[i];
         }
-        if (newZ - avec->outer_radius[i] < zlo) {
-          newZ = zlo + avec->outer_radius[i];
-        } else if (newZ + avec->outer_radius[i] > zhi) {
-          newZ = zhi - avec->outer_radius[i];
+        if (new_z - avec->outer_radius[i] < zlo) {
+          new_z = zlo + avec->outer_radius[i];
+        } else if (new_z + avec->outer_radius[i] > zhi) {
+          new_z = zhi - avec->outer_radius[i];
         }
-        atom->x[i][0] = newX;
-        atom->x[i][1] = newY;
-        atom->x[i][2] = newZ;
+        atom->x[i][0] = new_x;
+        atom->x[i][1] = new_y;
+        atom->x[i][2] = new_z;
 
         //create child
-        double childRadius = pow(((6 * childMass) / (density * MY_PI)), (1.0 / 3.0)) * 0.5;
-        double childOuterRadius = pow((3.0 / (4.0 * MY_PI)) * ((childMass / density) + (childOuterMass / eps_density)), (1.0 / 3.0));
+        double child_radius = pow(((6 * child_mass) / (density * MY_PI)), (1.0 / 3.0)) * 0.5;
+        double child_outerradius = pow((3.0 / (4.0 * MY_PI)) * ((child_mass / density) + (child_outermass / eps_density)), (1.0 / 3.0));
         double* coord = new double[3];
-        newX = oldX - (childOuterRadius * cos(thetaD) * sin(phiD) * DELTA);
-        newY = oldY - (childOuterRadius * sin(thetaD) * sin(phiD) * DELTA);
-        newZ = oldZ - (childOuterRadius * cos(phiD) * DELTA);
-        if (newX - childOuterRadius < xlo) {
-          newX = xlo + childOuterRadius;
-        } else if (newX + childOuterRadius > xhi) {
-          newX = xhi - childOuterRadius;
+
+        new_x = old_x - (child_outerradius * cos(thetaD) * sin(phiD) * DELTA);
+        new_y = old_y - (child_outerradius * sin(thetaD) * sin(phiD) * DELTA);
+        new_z = old_z - (child_outerradius * cos(phiD) * DELTA);
+
+        if (new_x - child_outerradius < xlo) {
+          new_x = xlo + child_outerradius;
+        } else if (new_x + child_outerradius > xhi) {
+          new_x = xhi - child_outerradius;
         }
-        if (newY - childOuterRadius < ylo) {
-          newY = ylo + childOuterRadius;
-        } else if (newY + childOuterRadius > yhi) {
-          newY = yhi - childOuterRadius;
+        if (new_y - child_outerradius < ylo) {
+          new_y = ylo + child_outerradius;
+        } else if (new_y + child_outerradius > yhi) {
+          new_y = yhi - child_outerradius;
         }
-        if (newZ - childOuterRadius < zlo) {
-          newZ = zlo + childOuterRadius;
-        } else if (newZ + childOuterRadius > zhi) {
-          newZ = zhi - childOuterRadius;
+        if (new_z - child_outerradius < zlo) {
+          new_z = zlo + child_outerradius;
+        } else if (new_z + child_outerradius > zhi) {
+          new_z = zhi - child_outerradius;
         }
-        coord[0] = newX;
-        coord[1] = newY;
-        coord[2] = newZ;
+        coord[0] = new_x;
+        coord[1] = new_y;
+        coord[2] = new_z;
 
         int n = 0;
         atom->avec->create_atom(atom->type[i], coord);
@@ -280,8 +289,9 @@ void FixDivide::post_integrate() {
         atom->omega[n][1] = atom->omega[i][1];
         atom->omega[n][2] = atom->omega[i][2];
 
-        atom->rmass[n] = childMass;
-        avec->outer_mass[n] = childOuterMass;
+        atom->rmass[n] = child_mass;
+        avec->outer_mass[n] = child_outermass;
+        avec->biomass[n] = child_biomass;
 
         atom->f[n][0] = childfx;
         atom->f[n][1] = childfy;
@@ -291,8 +301,8 @@ void FixDivide::post_integrate() {
         atom->torque[n][1] = atom->torque[i][1];
         atom->torque[n][2] = atom->torque[i][2];
 
-        atom->radius[n] = childRadius;
-        avec->outer_radius[n] = childOuterRadius;
+        atom->radius[n] = child_radius;
+        avec->outer_radius[n] = child_outerradius;
 
         modify->create_attribute(n);
 

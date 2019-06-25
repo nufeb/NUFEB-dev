@@ -185,7 +185,7 @@ FixKinetics::~FixKinetics() {
   memory->destroy(gibbs_anab);;
   memory->destroy(sh);
   memory->destroy(fv);
-  memory->destroy(xdensity);
+  memory->destroy(bio_dens);
 
   delete[] nuconv;
 }
@@ -267,7 +267,7 @@ void FixKinetics::init() {
   gibbs_anab = memory->create(gibbs_anab, ntypes + 1, ngrids, "kinetics:gibbs_anab");
   sh = memory->create(sh, ngrids, "kinetics:sh");
   fv = memory->create(fv, 3, ngrids, "kinetcis:fv");
-  xdensity = memory->create(xdensity, ntypes + 1, ngrids, "kinetics:xdensity");
+  bio_dens = memory->create(bio_dens, ntypes + 1, ngrids, "kinetics:xdensity");
 
   // Fitting initial domain decomposition to the grid 
   for (int i = 0; i < comm->procgrid[0]; i++) {
@@ -301,7 +301,7 @@ void FixKinetics::init_param() {
       if (bio->yield != NULL) grid_yield[i][j] = bio->yield[i];
       gibbs_cata[i][j] = 0;
       gibbs_anab[i][j] = 0;
-      xdensity[i][j] = 0;
+      bio_dens[i][j] = 0;
     }
 
     for (int i = 0; i <= bio->nnu; i++) {
@@ -477,16 +477,16 @@ void FixKinetics::update_xdensity() {
 
   for (int i = 0; i <= atom->ntypes; i++) {
     for (int j = 0; j < bgrids; j++) {
-      xdensity[i][j] = 0;
+      bio_dens[i][j] = 0;
     }
   }
 
   for (int i = 0; i < nlocal; i++) {
     int pos = position(i);
     int t = atom->type[i];
-    double xmass = atom->rmass[i] / vol;
-    xdensity[t][pos] += xmass;
-    xdensity[0][pos] += xmass;
+    double density = avec->biomass[i] / vol;
+    bio_dens[t][pos] += density;
+    bio_dens[0][pos] += density;
   }
 }
 

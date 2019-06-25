@@ -257,11 +257,6 @@ void FixKineticsMonod::growth(double dt, int gflag) {
   int *type = atom->type;
   int ntypes = atom->ntypes;
 
-  double *radius = atom->radius;
-  double *rmass = atom->rmass;
-  double *outer_mass = avec->outer_mass;
-  double *outer_radius = avec->outer_radius;
-
   double *mu = bio->mu;
   double *decay = bio->decay;
   double *maintain = bio->maintain;
@@ -271,7 +266,7 @@ void FixKineticsMonod::growth(double dt, int gflag) {
   double **nus = kinetics->nus;
   double **nur = kinetics->nur;
 
-  double **xdensity = kinetics->xdensity;
+  double **xdensity = kinetics->bio_dens;
 
   int *nuconv = kinetics->nuconv;
   double yield_eps = 0;
@@ -359,6 +354,7 @@ void FixKineticsMonod::update_biomass(double ***growrate, double dt) {
 
   double *radius = atom->radius;
   double *rmass = atom->rmass;
+  double *biomass = avec->biomass;
   double *outer_mass = avec->outer_mass;
   double *outer_radius = avec->outer_radius;
 
@@ -372,10 +368,14 @@ void FixKineticsMonod::update_biomass(double ***growrate, double dt) {
       int pos = kinetics->position(i);
 
       double density = rmass[i] / (four_thirds_pi * radius[i] * radius[i] * radius[i]);
-      rmass[i] = rmass[i] * (1 + growrate[t][0][pos] * dt);
+      double diff = biomass[i] * growrate[t][0][pos] * dt;
+
+      biomass[i] += diff;
+      rmass[i] += diff;
 
       if (species[t] == 1) {
-        outer_mass[i] = four_thirds_pi * (outer_radius[i] * outer_radius[i] * outer_radius[i] - radius[i] * radius[i] * radius[i]) * eps_dens + growrate[t][1][pos] * rmass[i] * dt;
+        outer_mass[i] = four_thirds_pi * (outer_radius[i] * outer_radius[i] * outer_radius[i] - radius[i] * radius[i] * radius[i])
+        		* eps_dens + growrate[t][1][pos] * biomass[i] * dt;
         outer_radius[i] = pow(three_quarters_pi * (rmass[i] / density + outer_mass[i] / eps_dens), third);
         radius[i] = pow(three_quarters_pi * (rmass[i] / density), third);
       } else {

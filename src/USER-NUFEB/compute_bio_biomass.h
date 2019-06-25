@@ -28,6 +28,8 @@ class ComputeNufebBiomass : public Compute {
   ~ComputeNufebBiomass();
   void init() {}
   virtual void compute_vector();
+
+  class AtomVecBio *avec;
 };
 
 }

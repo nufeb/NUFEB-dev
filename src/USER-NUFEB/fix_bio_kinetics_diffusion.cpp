@@ -363,7 +363,6 @@ int *FixKineticsDiffusion::diffusion(int *nuConv, int iter, double diff_dt) {
       }
 
       if (max_residual < tol) nuConv[i] = true;
-
 #if MPI_VERSION >= 3
       MPI_Iallreduce(MPI_IN_PLACE, &nuConv[i], 1, MPI_INT, MPI_BAND, world, &requests[nrequests++]);
 #else
@@ -436,9 +435,9 @@ void FixKineticsDiffusion::update_diff_coeff() {
     for (int grid = 0; grid < snxx_yy_zz; grid++) {
       int ind = get_index(grid);
 
-      if (ind != -1 && kinetics->xdensity[0][ind]) {
+      if (ind != -1 && kinetics->bio_dens[0][ind]) {
         if(dcflag == 1) {
-          grid_diff_coeff[i][grid] = bio->diff_coeff[i] * (1 - (0.43 * pow(kinetics->xdensity[0][ind]/vol,0.92)) / (11.19 + 0.27 * pow(kinetics->xdensity[0][ind]/vol,0.99)));
+          grid_diff_coeff[i][grid] = bio->diff_coeff[i] * (1 - (0.43 * pow(kinetics->bio_dens[0][ind]/vol,0.92)) / (11.19 + 0.27 * pow(kinetics->bio_dens[0][ind]/vol,0.99)));
         } else if (dcflag == 2) {
           grid_diff_coeff[i][grid] = bio->diff_coeff[i] * 0.8;
         }

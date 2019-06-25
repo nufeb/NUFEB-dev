@@ -62,7 +62,7 @@ class FixKinetics : public Fix, public DecompGrid<FixKinetics> {
   double **gibbs_anab;             // Gibbs free energy of anabolism [type][grid]
   double **keq;                    // equilibrium constants [nutrient][4]
   double *sh;                      // concentration of hydrogen ion
-  double **xdensity;               // grid biomass density [type][grid]; [0][grid] the overall density
+  double **bio_dens;               // grid biomass density [type][grid]; [0][grid] the overall density
   int *nuconv;                     // convergence flag
   double diff_dt;                  // diffusion timestep
   double blayer;                   // boundary layer

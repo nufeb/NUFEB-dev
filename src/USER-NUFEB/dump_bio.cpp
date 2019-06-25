@@ -43,6 +43,7 @@
 #include "compute_bio_avgcon.h"
 #include "compute_bio_avgph.h"
 #include "compute_bio_gas.h"
+#include "compute_bio_pressure.h"
 
 struct stat st = {0};
 
@@ -91,6 +92,7 @@ DumpBio::DumpBio(LAMMPS *lmp, int narg, char **arg) :
   height_flag = 0;
   rough_flag = 0;
   seg_flag = 0;
+  pres_flag = 0;
 
   // customize for new sections
   keywords = (char **) memory->srealloc(keywords, nkeywords*sizeof(char *), "keywords");
@@ -269,6 +271,8 @@ void DumpBio::init_style()
       avgph_flag = 1;
     } else if (strcmp(keywords[i],"gas") == 0) {
       gas_flag = 1;
+    } else if (strcmp(keywords[i],"pressure") == 0) {
+      pres_flag = 1;
     }
     else lmp->error->all(FLERR,"Undefined dump_bio keyword");
 
@@ -309,6 +313,9 @@ void DumpBio::init_style()
     } else if (strcmp(modify->compute[j]->style,"gas") == 0) {
       cgas = static_cast<ComputeNufebGas *>(lmp->modify->compute[j]);
       continue;
+    } else if (strcmp(modify->compute[j]->style,"pressure") == 0) {
+      cpres = static_cast<ComputeNufebPressure *>(lmp->modify->compute[j]);
+      continue;
     }
   }
 
@@ -331,6 +338,7 @@ void DumpBio::write()
   if (avgnus_flag == 1) cavgs->compute_vector();
   if (avgph_flag == 1) cavgph->compute_scalar();
   if (gas_flag == 1) cgas->compute_scalar();
+  if (pres_flag == 1) cpres->compute_scalar();
 
   int nnus = kinetics->bio->nnu;
   int ntypes = atom->ntypes;
@@ -464,6 +472,17 @@ void DumpBio::write()
     filename = path;
     fp = fopen(filename,"a");
     write_gas_data();
+    fclose(fp);
+  }
+
+  if (pres_flag == 1 && comm->me == 0) {
+    int len = 38;
+    char path[len];
+    strcpy(path, "./Results/pressure.csv");
+
+    filename = path;
+    fp = fopen(filename,"a");
+    write_pressure_data();
     fclose(fp);
   }
 
@@ -749,6 +768,14 @@ void DumpBio::write_segregate_data()
 {
   fprintf(fp, "%i, %e \n", update->ntimestep, cseg->scalar);
 }
+
+/* ---------------------------------------------------------------------- */
+
+void DumpBio::write_pressure_data()
+{
+  fprintf(fp, "%i, %e \n", update->ntimestep, cpres->scalar);
+}
+
 
 /* ---------------------------------------------------------------------- */
 
