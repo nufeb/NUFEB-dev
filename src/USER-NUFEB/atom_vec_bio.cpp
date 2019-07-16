@@ -38,9 +38,9 @@ AtomVecBio::AtomVecBio(LAMMPS *lmp) : AtomVec(lmp)
   radvary = 1;
   comm_x_only = 0;
   comm_f_only = 0;
-  size_forward = 7;
+  size_forward = 8;
   size_reverse = 6;
-  size_border = 10;
+  size_border = 11;
   size_velocity = 6;
   size_data_atom = 6;
   size_data_vel = 7;
@@ -117,7 +117,7 @@ void AtomVecBio::grow(int n)
 
   radius = memory->grow(atom->radius,nmax,"atom:radius");
   rmass = memory->grow(atom->rmass,nmax,"atom:rmass");
-  biomass = memory->grow(atom->rmass,nmax,"atom:biomass");
+  biomass = memory->grow(biomass,nmax,"atom:biomass");
   outer_mass = memory->grow(outer_mass,nmax,"atom:outer_mass");
   outer_radius = memory->grow(outer_radius,nmax,"atom:outer_radius");
   omega = memory->grow(atom->omega,nmax,3,"atom:omega");

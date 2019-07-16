@@ -173,7 +173,7 @@ void FixDivide::post_integrate() {
   for (int i = 0; i < nlocal; i++) {
     if (atom->mask[i] == avec->eps_mask || atom->mask[i] == avec->mask_dead)
       continue;
-
+   // printf("raidus[%i] = %e \n", atom->rmass[i]);
     if (atom->mask[i] & groupbit) {
       double density = atom->rmass[i] / (4.0 * MY_PI / 3.0 * atom->radius[i] * atom->radius[i] * atom->radius[i]);
 
