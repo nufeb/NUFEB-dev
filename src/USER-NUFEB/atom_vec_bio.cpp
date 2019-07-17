@@ -35,7 +35,6 @@ AtomVecBio::AtomVecBio(LAMMPS *lmp) : AtomVec(lmp)
 {
   molecular = 0;
 
-  radvary = 1;
   comm_x_only = 0;
   comm_f_only = 0;
   size_forward = 8;
@@ -85,6 +84,8 @@ void AtomVecBio::init()
 {
   AtomVec::init();
   set_group_mask();
+
+  radvary = 1;
 
   for (int i = 0; i < atom->nlocal; i++) {
     if(!outer_radius[i]) outer_radius[i] = atom->radius[i];
