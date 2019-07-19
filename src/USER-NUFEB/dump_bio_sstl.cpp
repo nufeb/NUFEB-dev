@@ -32,6 +32,7 @@
 #include "bio.h"
 #include "fix_bio_kinetics.h"
 #include "math_const.h"
+#include "pointers.h"
 
 #include "compute_bio_height.h"
 #include "compute_bio_ntypes.h"
@@ -158,7 +159,6 @@ void DumpBioSSTL::init_style()
   strcpy(path, "./SSTL/sstl_model.txt");
 
   filename = path;
-  printf("%s \n", filename);
   fp = fopen(filename,"a");
   write_sstl_model();
   fclose(fp);
@@ -174,7 +174,7 @@ void DumpBioSSTL::init_style()
       ntypes_flag = 1;
     } else if (strcmp(keywords[i],"pressure") == 0) {
       pres_flag = 1;
-    } else if (strcmp(keywords[i],"vol_frac") == 0) {
+    } else if (strcmp(keywords[i],"vof") == 0) {
       volfrac_flag = 1;
       vol_frac = memory->create(vol_frac, atom->ntypes + 1, kinetics->ngrids, "dumpsstl:vol_frac");
 
@@ -283,8 +283,10 @@ void DumpBioSSTL::write()
   }
 
   if (volfrac_flag == 1) {
-    for (int i = 1; i < ntypes+1; i++) {
-	    char *name = bio->tname[i];
+    for (int i = 0; i < ntypes+1; i++) {
+    	char *name;
+	    if (i == 0) name = "all";
+	    else name = bio->tname[i];
 		int len = 30;
 		len += strlen(name);
 		char path[len];
@@ -321,42 +323,36 @@ void DumpBioSSTL::pack(tagint *ids)
 
 void DumpBioSSTL::write_sstl_model()
 {
-  if (comm->me == 0) fprintf(fp, "LOCATIONS \n");
+  int nxyz = kinetics->nx*kinetics->ny*kinetics->nz;
+  int ngrids = kinetics->ngrids;
 
-  // write node index
-  MPI_Barrier(MPI_COMM_WORLD);
-  for(int i = 0; i < kinetics->ngrids; i++){
-	double gridx[3] = {0,0,0};
-    get_grid_x(i, gridx);
-	int global_id = get_global_id(i, gridx);
+  if (comm->me == 0) {
+	  fprintf(fp, "LOCATIONS\n");
+	  for(int i = 0; i < nxyz; i++){
+		 fprintf(fp, "%i\n", i+1);
+	  }
 
-	fprintf(fp, "%i\n",global_id);
-  }
+	  fprintf(fp, "EDGES\n");
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (comm->me == 0)fprintf(fp, "EDGES \n");
-  MPI_Barrier(MPI_COMM_WORLD);
+	  // write edges
+	  for(int i = 0; i < nxyz; i++){
+		double gridx[3] = {0,0,0};
+		get_global_gridx(i, gridx);
 
-  // write edges
-  for(int i = 0; i < kinetics->ngrids; i++){
-	double gridx[3] = {0,0,0};
-    get_grid_x(i, gridx);
-
-	int global_id = get_global_id(i, gridx);
-
-    int lhs = global_id - 1;   // x direction
-    int rhs = global_id + 1;  // x direction
-    int bwd = global_id - kinetics->nx;  // y direction
-    int fwd = global_id + kinetics->nx;  // y direction
-    int down = global_id - kinetics->nx * kinetics->ny; // z direction
-    int up = global_id + kinetics->nx * kinetics->ny;  // z direction
-    //printf("%i l=%i r=%i b=%i f=%i d=%i u=%i x=%e y=%e z=%e, %e \n", i, lhs, rhs, bwd, fwd, down, up, gridx[0], gridx[1], gridx[2], stepy);
-	if (gridx[0] - stepx > xlo) fprintf(fp, "%i,%i,1\n",global_id, lhs);
-	if (gridx[0] + stepx < xhi) fprintf(fp, "%i,%i,1\n",global_id, rhs);
-	if (gridx[1] - stepy > ylo) fprintf(fp, "%i,%i,1\n",global_id, bwd);
-	if (gridx[1] + stepy < yhi) fprintf(fp, "%i,%i,1\n",global_id, fwd);
-	if (gridx[2] - stepz > zlo) fprintf(fp, "%i,%i,1\n",global_id, down);
-	if (gridx[2] + stepz < zhi) fprintf(fp, "%i,%i,1\n",global_id, up);
+	    //int lhs = i - 1;   // x direction
+	    int rhs = i + 1;  // x direction
+	    //int bwd = i - kinetics->nx;  // y direction
+	    int fwd = i + kinetics->nx;  // y direction
+	    //int down = i - kinetics->nx * kinetics->ny; // z direction
+	    int up = i + kinetics->nx * kinetics->ny;  // z direction
+	    //printf("%i l=%i r=%i b=%i f=%i d=%i u=%i x=%e y=%e z=%e, %e \n", i, lhs, rhs, bwd, fwd, down, up, gridx[0], gridx[1], gridx[2], stepy);
+		//if (gridx[0] - stepx > xlo) fprintf(fp, "%i %i 1\n",i, lhs);
+		if (gridx[0] + stepx < xhi) fprintf(fp, "%i %i 1\n",i, rhs);
+		//if (gridx[1] - stepy > ylo) fprintf(fp, "%i %i 1\n",i, bwd);
+		if (gridx[1] + stepy < yhi) fprintf(fp, "%i %i 1\n",i, fwd);
+		//if (gridx[2] - stepz > zlo) fprintf(fp, "%i %i 1\n",i, down);
+		if (gridx[2] + stepz < zhi) fprintf(fp, "%i %i 1\n",i, up);
+	  }
   }
 }
 
@@ -388,31 +384,151 @@ double* DumpBioSSTL::get_grid_x(int i, double* gridx) {
 	return gridx;
 }
 
+double* DumpBioSSTL::get_global_gridx(int i, double* gridx) {
+
+    int zpos = i / (kinetics->nx * kinetics->ny);
+    int ypos = (i - zpos * (kinetics->nx * kinetics->ny)) / kinetics->nx;
+    int xpos = i - zpos * (kinetics->nx * kinetics->ny) - ypos * kinetics->nx;
+
+    xpos++;
+    ypos++;
+    zpos++;
+
+    gridx[0] = xpos * stepx - stepx/2;
+    gridx[1] = ypos * stepy - stepy/2;
+    gridx[2] = zpos * stepz - stepz/2;
+
+	return gridx;
+}
+
 void DumpBioSSTL::write_nus_data(int nuID)
 {
-  fprintf(fp, "Time %f\n",get_time());
+  int ngrids = kinetics->ngrids;
+  int nxyz = kinetics->nx*kinetics->ny*kinetics->nz;
+
+  int *local_id = new int[ngrids];
+  int *local_size = new int[comm->nprocs];
+
+  int *full_id = new int[nxyz];
+  double *full_s = new double[nxyz];
 
   for(int i = 0; i < kinetics->ngrids; i++){
     double gridx[3] = {0,0,0};
-	get_grid_x(i, gridx);
-    int global_id = get_global_id(i, gridx);
-
-    fprintf(fp, "%i, %e\n",global_id, kinetics->nus[nuID][i]);
+  	get_grid_x(i, gridx);
+  	local_id[i] = get_global_id(i, gridx);
   }
+
+  MPI_Gather(&ngrids, 1, MPI_INT, local_size, 1, MPI_INT, 0, world);
+
+  // send grid id
+  if(comm->me != 0) {
+	  MPI_Request request;
+	  MPI_Send(local_id, ngrids, MPI_INT, 0, comm->me, world);
+  } else {
+	 for(int i = 0; i < kinetics->ngrids; i++){
+		 full_id[i] = local_id[i];
+	 }
+
+	 int start = ngrids;
+	 for(int i = 1; i < comm->nprocs; i++){
+		 MPI_Recv(&full_id[start], local_size[i], MPI_INT, i, i, world, MPI_STATUS_IGNORE);
+		 start += local_size[i];
+	 }
+  }
+
+  // send nus
+  double *nus = kinetics->nus[nuID];
+  if(comm->me != 0) {
+	  MPI_Request request;
+	  MPI_Send(nus, ngrids, MPI_DOUBLE, 0, comm->me, world);
+  } else {
+	 for(int i = 0; i < kinetics->ngrids; i++){
+		 full_s[i] = nus[i];
+	 }
+
+	 int start = ngrids;
+	 for(int i = 1; i < comm->nprocs; i++){
+		 MPI_Recv(&full_s[start], local_size[i], MPI_DOUBLE, i, i, world, MPI_STATUS_IGNORE);
+		 start += local_size[i];
+	 }
+  }
+
+  if (comm->me == 0) {
+	 fprintf(fp, "Time %f\n",get_time());
+	 for(int i = 0; i < nxyz; i++){
+		fprintf(fp, "%i, %e\n",full_id[i]+1, full_s[i]);
+	 }
+  }
+
+  delete local_id;
+  delete local_size;
+  delete full_id;
+  delete full_s;
 }
 
 void DumpBioSSTL::write_volf_data(int t)
 {
 
-  fprintf(fp, "Time %f\n",get_time());
+  int ngrids = kinetics->ngrids;
+  int nxyz = kinetics->nx*kinetics->ny*kinetics->nz;
+
+  int *local_id = new int[ngrids];
+  int *local_size = new int[comm->nprocs];
+
+  int *full_id = new int[nxyz];
+  double *full_vf = new double[nxyz];
 
   for(int i = 0; i < kinetics->ngrids; i++){
-    double gridx[3] = {0,0,0};
+	double gridx[3] = {0,0,0};
 	get_grid_x(i, gridx);
-    int global_id = get_global_id(i, gridx);
-
-    fprintf(fp, "%i, %e\n",global_id, vol_frac[t][i]);
+	local_id[i] = get_global_id(i, gridx);
   }
+
+  MPI_Gather(&ngrids, 1, MPI_INT, local_size, 1, MPI_INT, 0, world);
+
+  // send grid id
+  if(comm->me != 0) {
+	  MPI_Request request;
+	  MPI_Send(local_id, ngrids, MPI_INT, 0, comm->me, world);
+  } else {
+	 for(int i = 0; i < kinetics->ngrids; i++){
+		 full_id[i] = local_id[i];
+	 }
+
+	 int start = ngrids;
+	 for(int i = 1; i < comm->nprocs; i++){
+		 MPI_Recv(&full_id[start], local_size[i], MPI_INT, i, i, world, MPI_STATUS_IGNORE);
+		 start += local_size[i];
+	 }
+  }
+
+  // send volume fraction
+  if(comm->me != 0) {
+	  MPI_Request request;
+	  MPI_Send(vol_frac[t], ngrids, MPI_DOUBLE, 0, comm->me, world);
+  } else {
+	 for(int i = 0; i < kinetics->ngrids; i++){
+		 full_vf[i] = vol_frac[t][i];
+	 }
+
+	 int start = ngrids;
+	 for(int i = 1; i < comm->nprocs; i++){
+		 MPI_Recv(&full_vf[start], local_size[i], MPI_DOUBLE, i, i, world, MPI_STATUS_IGNORE);
+		 start += local_size[i];
+	 }
+  }
+
+  if (comm->me == 0) {
+	 fprintf(fp, "Time %f\n",get_time());
+	 for(int i = 0; i < nxyz; i++){
+		fprintf(fp, "%i, %e\n",full_id[i]+1, full_vf[i]);
+	 }
+  }
+
+  delete local_id;
+  delete local_size;
+  delete full_id;
+  delete full_vf;
 }
 
 /* ---------------------------------------------------------------------- */

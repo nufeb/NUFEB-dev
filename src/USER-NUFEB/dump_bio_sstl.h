@@ -78,6 +78,7 @@ class DumpBioSSTL : public Dump {
   double get_time();
   int get_global_id(int, double*);
   double* get_grid_x(int, double*);
+  double* get_global_gridx(int, double*);
   void update_volf();
 
   bigint memory_usage();
