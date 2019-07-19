@@ -115,7 +115,8 @@ public class IBM {
  }
 
 	public static double check(jSSTLScript script, GraphModel graph, int runs) throws IOException {
-
+		PrintWriter stprinter = new PrintWriter("data/"+"surface"+"boolen.txt");
+		
 		for (int i = 0; i < runs; i++) {
 			
 			Signal s = readMeshTraj(graph, "models/trajectories/surface/volf_all.txt");
@@ -123,14 +124,12 @@ public class IBM {
 			SpatialBooleanSignal boolSign = script.getFormula("surface").booleanCheck(null, graph, s);
 			for (int j = 0; j < graph.getNumberOfLocations(); j++) {
 				BooleanSignal b = boolSign.spatialBoleanSignal.get(graph.getLocation(j));
-				System.out.println("loc:" + graph.getLocation(j)+ "," + b.getValueAt(10.0));
+				int value = b.getValueAt(10.0) ? 1 : 0;
+				stprinter.println(graph.getLocation(j)+ "," + value);
 			}
 
 		}
-//
-//		PrintWriter stprinter = new PrintWriter("data/"+formula+"_sdev.txt");
-//		stprinter.print(textStdev);
-//		stprinter.close();
+		stprinter.close();
 		return runs;
 	}
 	

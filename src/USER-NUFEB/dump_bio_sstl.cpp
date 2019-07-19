@@ -519,6 +519,7 @@ void DumpBioSSTL::write_volf_data(int t)
   }
 
   if (comm->me == 0) {
+     fprintf(fp, "# of locations: %i\n",nxyz);
 	 fprintf(fp, "Time %f\n",get_time());
 	 for(int i = 0; i < nxyz; i++){
 		fprintf(fp, "%i, %e\n",full_id[i]+1, full_vf[i]);
