@@ -30,8 +30,11 @@
 
 #include <regex>
 #include <sstream>
+#include <iostream>
+#include <string>
 
 using namespace LAMMPS_NS;
+using namespace std;
 
 DumpGrid::DumpGrid(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, arg), bio(nullptr), kinetics(nullptr), energy(nullptr) {
   AtomVecBio *avec = (AtomVecBio *) atom->style_match("bio");
@@ -39,11 +42,14 @@ DumpGrid::DumpGrid(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, arg), bi
     error->all(FLERR, "Dump grid requires atom style bio");
 
   bio = avec->bio;
+  sstl_flag = 0;
 
   parse_fields(narg, arg);
 }
 
-DumpGrid::~DumpGrid() {}
+DumpGrid::~DumpGrid() {
+	   if (sstl_flag) delete []sstl_data;
+}
 
 void DumpGrid::init_style() {
   using std::placeholders::_1;
@@ -92,6 +98,11 @@ void DumpGrid::init_style() {
 	packs.push_back(std::bind(&DumpGrid::pack_hydronium, this, _1));
       else
 	error->warning(FLERR, "dump grid 'hyd' argument only available when using kinetics/energy");
+    }
+    else if (*it == "sstl") {
+    	sstl_flag = 1;
+    	sstl_data = new double[kinetics->ngrids];
+        packs.push_back(std::bind(&DumpGrid::pack_sstl, this, _1));
     }
   }
 }
@@ -147,6 +158,9 @@ int DumpGrid::parse_fields(int narg, char **arg) {
       fields.push_back(arg[iarg]);
     } else if (strcmp(arg[iarg], "hyd") == 0) {
       fields.push_back(arg[iarg]);
+    } else if (strcmp(arg[iarg], "sstl") == 0) {
+    	sstl_file = arg[iarg+1];
+        fields.push_back(arg[iarg]);
     }
   }
 }
@@ -177,6 +191,12 @@ void DumpGrid::pack_anabolism(vtkSmartPointer<vtkImageData> image) {
 
 void DumpGrid::pack_hydronium(vtkSmartPointer<vtkImageData> image) {
   pack_tuple1(image, "hydronium", kinetics->sh);
+}
+
+void DumpGrid::pack_sstl(vtkSmartPointer<vtkImageData> image) {
+  //printf("kinetics->subgrid.cell_count() = %i\n",kinetics->subgrid.cell_count());
+    read_sstl_data(sstl_file, sstl_data);
+  pack_tuple1(image, "sstl", sstl_data);
 }
 
 void DumpGrid::pack_tuple1(vtkSmartPointer<vtkImageData> image, const char *name, double *data) {
@@ -217,6 +237,18 @@ void DumpGrid::pack_tuple5(vtkSmartPointer<vtkImageData> image, const char *name
       array->InsertNextTuple(tuple);
     }
     image->GetCellData()->AddArray(array);
+  }
+}
+
+void DumpGrid::read_sstl_data(char *sstl_file, double *result) {
+  ifstream infile(sstl_file);
+  string line;
+
+  int i = 0;
+  while (getline(infile, line))
+  {
+	  result[i] = atof(line.c_str());
+	  i++;
   }
 }
 #endif // ENABLE_DUMP_GRID

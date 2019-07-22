@@ -42,6 +42,7 @@ class DumpGrid : public Dump {
   void pack(tagint *) {}
   void write_data(int, double *) {}
   int parse_fields(int narg, char **arg);
+  void read_sstl_data(char *, double*);
 
   void pack_concentration(vtkSmartPointer<vtkImageData>);
   void pack_uptake(vtkSmartPointer<vtkImageData>);
@@ -50,6 +51,7 @@ class DumpGrid : public Dump {
   void pack_catabolism(vtkSmartPointer<vtkImageData>);
   void pack_anabolism(vtkSmartPointer<vtkImageData>);
   void pack_hydronium(vtkSmartPointer<vtkImageData>);
+  void pack_sstl(vtkSmartPointer<vtkImageData>);
   void pack_tuple1(vtkSmartPointer<vtkImageData>, const char *, double *);
   void pack_tuple1(vtkSmartPointer<vtkImageData>, const char *, double **, char **, int);
   void pack_tuple5(vtkSmartPointer<vtkImageData>, const char *, double ***, char **, int);
@@ -59,6 +61,10 @@ class DumpGrid : public Dump {
   FixKineticsEnergy *energy;
   std::vector<std::string> fields;
   std::vector<std::function<void(vtkSmartPointer<vtkImageData>)>> packs;
+
+  double *sstl_data;
+  char *sstl_file;
+  int sstl_flag;
 };
 }
 
