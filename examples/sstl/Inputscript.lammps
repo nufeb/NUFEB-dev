@@ -55,7 +55,7 @@ variable deadDia equal 9e-7
 
 ##############Define IBm Commands##############
 
-fix k1 all kinetics 100 10 4 10 v_diffT v_layer niter 5000
+fix k1 all kinetics 100 30 12 24 v_diffT v_layer niter 4000
 fix kgm all kinetics/growth/monod v_EPSdens v_etaHET
 fix g1 all kinetics/diffusion v_tol pp pp nd kg dcflag 2
 fix d1 all divide 100 v_EPSdens v_divDia 64564
@@ -71,14 +71,14 @@ compute myPres all bio/pressure NULL pair vol v_vol
 ##############Simulation Output##############
 
 #dump		id all custom 1000 output.lammmps id type diameter x y z
-#dump		du1 all custom/vtk 1000 atom_*.vtu id type diameter x y z
-#dump		du2 all grid 1000 grid_%_*.vti con vof
-dump du3 all bio/sstl 70000 biomass ntypes con vof
+dump		du1 all custom/vtk 80000 atom_*.vtu id type diameter x y z
+#dump		du2 all grid 7000 grid_%_*.vti con
+dump du3 all bio/sstl 80000 biomass ntypes con vof
 thermo_style    custom step cpu atoms c_myNtypes[2] c_myNtypes[3] c_myBiomass[*]
 thermo		100
 thermo_modify	lost ignore
 
 
-run 70000
+run 80000
 
 

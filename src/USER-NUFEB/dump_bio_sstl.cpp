@@ -153,15 +153,7 @@ void DumpBioSSTL::init_style()
       mkdir("./SSTL", 0700);
   }
 
-  // create sstl graph model
-  int len = 22;
-  char path[len];
-  strcpy(path, "./SSTL/sstl_model.txt");
-
-  filename = path;
-  fp = fopen(filename,"a");
   write_sstl_model();
-  fclose(fp);
 
   while (i < nkeywords) {
     if (strcmp(keywords[i],"con") == 0) {
@@ -219,7 +211,6 @@ void DumpBioSSTL::write()
 
   int nnus = kinetics->bio->nnu;
   int ntypes = atom->ntypes;
-
 
   if (mass_flag == 1 && comm->me == 0) {
     int len = 35;
@@ -283,6 +274,7 @@ void DumpBioSSTL::write()
   }
 
   if (volfrac_flag == 1) {
+
     for (int i = 0; i < ntypes+1; i++) {
     	char *name;
 	    if (i == 0) name = "all";
@@ -324,9 +316,16 @@ void DumpBioSSTL::pack(tagint *ids)
 void DumpBioSSTL::write_sstl_model()
 {
   int nxyz = kinetics->nx*kinetics->ny*kinetics->nz;
-  int ngrids = kinetics->ngrids;
 
   if (comm->me == 0) {
+	  // create sstl graph model
+	  int len = 22;
+	  char path[len];
+	  strcpy(path, "./SSTL/sstl_model.txt");
+
+	  filename = path;
+	  fp = fopen(filename,"w");
+
 	  fprintf(fp, "LOCATIONS\n");
 	  for(int i = 0; i < nxyz; i++){
 		 fprintf(fp, "%i\n", i+1);
@@ -339,21 +338,17 @@ void DumpBioSSTL::write_sstl_model()
 		double gridx[3] = {0,0,0};
 		get_global_gridx(i, gridx);
 
-	    //int lhs = i - 1;   // x direction
 	    int rhs = i + 1;  // x direction
-	    //int bwd = i - kinetics->nx;  // y direction
 	    int fwd = i + kinetics->nx;  // y direction
-	    //int down = i - kinetics->nx * kinetics->ny; // z direction
 	    int up = i + kinetics->nx * kinetics->ny;  // z direction
-	    //printf("%i l=%i r=%i b=%i f=%i d=%i u=%i x=%e y=%e z=%e, %e \n", i, lhs, rhs, bwd, fwd, down, up, gridx[0], gridx[1], gridx[2], stepy);
-		//if (gridx[0] - stepx > xlo) fprintf(fp, "%i %i 1\n",i, lhs);
 		if (gridx[0] + stepx < xhi) fprintf(fp, "%i %i 1\n",i, rhs);
-		//if (gridx[1] - stepy > ylo) fprintf(fp, "%i %i 1\n",i, bwd);
 		if (gridx[1] + stepy < yhi) fprintf(fp, "%i %i 1\n",i, fwd);
-		//if (gridx[2] - stepz > zlo) fprintf(fp, "%i %i 1\n",i, down);
 		if (gridx[2] + stepz < zhi) fprintf(fp, "%i %i 1\n",i, up);
 	  }
+
+	  fclose(fp);
   }
+
 }
 
 int DumpBioSSTL::get_global_id(int i, double* gridx)
@@ -454,7 +449,7 @@ void DumpBioSSTL::write_nus_data(int nuID)
   }
 
   if (comm->me == 0) {
-	 fprintf(fp, "Time %f\n",get_time());
+	 fprintf(fp, "Time,%f\n",get_time());
 	 for(int i = 0; i < nxyz; i++){
 		fprintf(fp, "%i, %e\n",full_id[i]+1, full_s[i]);
 	 }
@@ -519,8 +514,7 @@ void DumpBioSSTL::write_volf_data(int t)
   }
 
   if (comm->me == 0) {
-     fprintf(fp, "# of locations: %i\n",nxyz);
-	 fprintf(fp, "Time %f\n",get_time());
+	 fprintf(fp, "Time,%f\n",get_time());
 	 for(int i = 0; i < nxyz; i++){
 		fprintf(fp, "%i, %e\n",full_id[i]+1, full_vf[i]);
 	 }

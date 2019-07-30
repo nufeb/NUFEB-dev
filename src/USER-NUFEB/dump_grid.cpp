@@ -101,7 +101,7 @@ void DumpGrid::init_style() {
     }
     else if (*it == "sstl") {
     	sstl_flag = 1;
-    	sstl_data = new double[kinetics->ngrids];
+    	sstl_data = new double[kinetics->nx * kinetics->ny * kinetics->nz];
         packs.push_back(std::bind(&DumpGrid::pack_sstl, this, _1));
     }
   }

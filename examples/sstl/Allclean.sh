@@ -6,3 +6,4 @@ rm slurm-*
 rm -rf Results
 rm output.lammps
 rm log.lammps
+rm -rf SSTL
