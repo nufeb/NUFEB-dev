@@ -195,7 +195,7 @@ void DumpGrid::pack_hydronium(vtkSmartPointer<vtkImageData> image) {
 
 void DumpGrid::pack_sstl(vtkSmartPointer<vtkImageData> image) {
   //printf("kinetics->subgrid.cell_count() = %i\n",kinetics->subgrid.cell_count());
-    read_sstl_data(sstl_file, sstl_data);
+  read_sstl_data(sstl_file, sstl_data);
   pack_tuple1(image, "sstl", sstl_data);
 }
 
@@ -243,7 +243,6 @@ void DumpGrid::pack_tuple5(vtkSmartPointer<vtkImageData> image, const char *name
 void DumpGrid::read_sstl_data(char *sstl_file, double *result) {
   ifstream infile(sstl_file);
   string line;
-
   int i = 0;
   while (getline(infile, line))
   {

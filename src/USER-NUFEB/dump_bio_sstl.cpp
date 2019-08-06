@@ -52,12 +52,12 @@ using namespace MathConst;
 DumpBioSSTL::DumpBioSSTL(LAMMPS *lmp, int narg, char **arg) :
   Dump(lmp, narg, arg)
 {
-  if (narg <= 4) error->all(FLERR,"No dump sstl arguments specified");
+  if (narg <= 6) error->all(FLERR,"No dump sstl arguments specified");
 
   nevery = force->inumeric(FLERR,arg[3]);
   if (nevery <= 0) error->all(FLERR,"Illegal dump sstl command");
 
-  nkeywords = narg - 4;
+  nkeywords = narg - 6;
 
   nfix = 0;
   id_fix = NULL;
@@ -71,6 +71,7 @@ DumpBioSSTL::DumpBioSSTL(LAMMPS *lmp, int narg, char **arg) :
   height_flag = 0;
   pres_flag = 0;
   volfrac_flag = 0;
+  gridx_flag = 0;
 
   mass_header = 0;
   type_header = 0;
@@ -79,9 +80,9 @@ DumpBioSSTL::DumpBioSSTL(LAMMPS *lmp, int narg, char **arg) :
   keywords = (char **) memory->srealloc(keywords, nkeywords*sizeof(char *), "keywords");
 
   for (int i = 0; i < nkeywords; i++) {
-    int n = strlen(arg[i+4]) + 2;
+    int n = strlen(arg[i+6]) + 2;
     keywords[i] = new char[n];
-    strcpy(keywords[i], arg[i+4]);
+    strcpy(keywords[i], arg[i+6]);
   }
 }
 
@@ -166,6 +167,8 @@ void DumpBioSSTL::init_style()
       ntypes_flag = 1;
     } else if (strcmp(keywords[i],"pressure") == 0) {
       pres_flag = 1;
+    } else if (strcmp(keywords[i],"gridx") == 0) {
+      gridx_flag = 1;
     } else if (strcmp(keywords[i],"vof") == 0) {
       volfrac_flag = 1;
       vol_frac = memory->create(vol_frac, atom->ntypes + 1, kinetics->ngrids, "dumpsstl:vol_frac");
@@ -274,7 +277,6 @@ void DumpBioSSTL::write()
   }
 
   if (volfrac_flag == 1) {
-
     for (int i = 0; i < ntypes+1; i++) {
     	char *name;
 	    if (i == 0) name = "all";
@@ -292,6 +294,18 @@ void DumpBioSSTL::write()
 	    write_volf_data(i);
 		fclose(fp);
 	  }
+  }
+
+  if (gridx_flag == 1) {
+
+		int len = 30;
+		char path[len];
+		strcpy(path, "./SSTL/gridx.txt");
+
+		filename = path;
+	    fp = fopen(filename,"a");
+	    write_gridx_data() ;
+		fclose(fp);
   }
 }
 
@@ -328,6 +342,8 @@ void DumpBioSSTL::write_sstl_model()
 
 	  fprintf(fp, "LOCATIONS\n");
 	  for(int i = 0; i < nxyz; i++){
+		 double gridx[3] = {0,0,0};
+		 get_global_gridx(i, gridx);
 		 fprintf(fp, "%i\n", i+1);
 	  }
 
@@ -396,6 +412,29 @@ double* DumpBioSSTL::get_global_gridx(int i, double* gridx) {
 	return gridx;
 }
 
+double DumpBioSSTL::get_gridx(int i)
+{
+  int ngrids = kinetics->ngrids;
+  int nxyz = kinetics->nx*kinetics->ny*kinetics->nz;
+  int nx = kinetics->nx;
+  int ny = kinetics->ny;
+  int nz = kinetics->nz;
+
+  int zpos = i / (nx * ny);
+  int ypos = (i - zpos * (nx * ny)) / nx;
+  int xpos = i - zpos * (nx * ny) - ypos * nx;
+
+  xpos++;
+  ypos++;
+  zpos++;
+
+  double gridx = xpos * stepx - stepx/2;
+	//gridx[1] = kinetics->sublo[1] + ypos * stepy - stepy/2;
+	//gridx[2] = kinetics->sublo[2] + zpos * stepz - stepz/2;
+
+  return gridx;
+}
+
 void DumpBioSSTL::write_nus_data(int nuID)
 {
   int ngrids = kinetics->ngrids;
@@ -461,6 +500,18 @@ void DumpBioSSTL::write_nus_data(int nuID)
   delete full_s;
 }
 
+void DumpBioSSTL::write_gridx_data(){
+	  int nxyz = kinetics->nx*kinetics->ny*kinetics->nz;
+
+  if (comm->me == 0) {
+	 fprintf(fp, "Time,%f\n",get_time());
+	 for(int i = 0; i < nxyz; i++){
+		double gridx = get_gridx(i);
+		fprintf(fp, "%i, %e\n",i+1, gridx);
+	 }
+  }
+}
+
 void DumpBioSSTL::write_volf_data(int t)
 {
 
@@ -477,6 +528,7 @@ void DumpBioSSTL::write_volf_data(int t)
 	double gridx[3] = {0,0,0};
 	get_grid_x(i, gridx);
 	local_id[i] = get_global_id(i, gridx);
+	 // printf("com=%i get_global_id[%i] = %i, x=%e, y=%e, z=%e \n", comm->me, i, local_id[i], gridx[0], gridx[1], gridx[2]);
   }
 
   MPI_Gather(&ngrids, 1, MPI_INT, local_size, 1, MPI_INT, 0, world);
@@ -517,6 +569,7 @@ void DumpBioSSTL::write_volf_data(int t)
 	 fprintf(fp, "Time,%f\n",get_time());
 	 for(int i = 0; i < nxyz; i++){
 		fprintf(fp, "%i, %e\n",full_id[i]+1, full_vf[i]);
+		//fprintf(fp, "%e\n",full_vf[i]);
 	 }
   }
 
@@ -590,7 +643,7 @@ void DumpBioSSTL::write_ntype_data()
 
 double DumpBioSSTL::get_time()
 {
-	return (update->ntimestep*update->dt)/nevery;
+	return update->ntimestep*update->dt;
 }
 
 void DumpBioSSTL::update_volf() {

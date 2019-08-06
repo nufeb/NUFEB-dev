@@ -1,0 +1,49 @@
+# NUFEB simulation
+
+atom_style	bio
+atom_modify	map array sort 100 5.0e-7
+boundary	pp pp ff
+newton		off
+processors  1 1 1
+
+comm_modify	vel yes
+read_data_bio atom.in
+
+group HET type 1
+group EPS type 2
+
+neighbor	5e-7 bin
+neigh_modify	delay 0 one 5000
+
+##############Define DEM Variables&Commands##############
+
+pair_style  gran/hooke/history 1.e-4 NULL 1.e-5 NULL 0.0 1
+pair_coeff  * *
+
+timestep 1
+
+
+##############Define IBm Variables##############
+
+#variables used in fix kinetics 
+variable diffT equal 1e-4
+variable tol equal 1e-6
+variable etaHET equal 0.6
+variable layer equal -1
+
+
+##############Define IBm Commands##############
+
+fix k1 all kinetics 1 60 8 20 v_diffT v_layer niter 1
+
+##############Simulation Output##############
+
+dump		du1 all grid 1 grid0l_%_*.vti sstl shear3.txt
+thermo_style    custom step cpu 
+thermo		1
+thermo_modify	lost ignore
+
+
+run 1
+
+

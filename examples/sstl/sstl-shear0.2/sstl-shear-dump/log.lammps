@@ -9,7 +9,7 @@ processors  1 1 1
 
 comm_modify	vel yes
 read_data_bio atom.in
-  orthogonal box = (0 0 0) to (0.0001 4e-05 8e-05)
+  orthogonal box = (0 0 0) to (0.0002 4e-05 0.0001)
   1 by 1 by 1 MPI processor grid
   reading atoms ...
   1 atoms
@@ -42,13 +42,11 @@ variable layer equal -1
 
 ##############Define IBm Commands##############
 
-fix k1 all kinetics 1 30 12 24 v_diffT v_layer niter 1
+fix k1 all kinetics 1 60 8 20 v_diffT v_layer niter 1
 
 ##############Simulation Output##############
 
-dump		id all custom 1 output.lammmps id type diameter x y z
-#dump		du1 all custom/vtk 1 atom_*.vtu id type diameter x y z
-dump		du2 all grid 1 grid_%_*.vti sstl surface.txt
+dump		du1 all grid 1 grid0l_%_*.vti sstl shear3.txt
 thermo_style    custom step cpu
 thermo		1
 thermo_modify	lost ignore
@@ -61,15 +59,15 @@ Neighbor list info ...
   max neighbors/atom: 5000, page size: 100000
   master list distance cutoff = 1.5e-06
   ghost atom cutoff = 1.5e-06
-  binsize = 7.5e-07 -> bins = 134 54 107
-Memory usage per processor = 11.7162 Mbytes
+  binsize = 7.5e-07 -> bins = 267 54 134
+Memory usage per processor = 15.4716 Mbytes
 Step CPU 
        0            0 
-       1 0.0025579929 
-Loop time of 0.00256586 on 1 procs for 1 steps with 1 atoms
+       1 0.0024468899 
+Loop time of 0.00245976 on 1 procs for 1 steps with 1 atoms
 
-Performance: 33672910.760 tau/day, 389.733 timesteps/s
-70.0% CPU use with 1 MPI tasks x no OpenMP threads
+Performance: 35125314.103 tau/day, 406.543 timesteps/s
+69.2% CPU use with 1 MPI tasks x no OpenMP threads
 
 MPI task timing breakdown:
 Section |  min time  |  avg time  |  max time  |%varavg| %total
@@ -77,9 +75,9 @@ Section |  min time  |  avg time  |  max time  |%varavg| %total
 Pair    | 9.5367e-07 | 9.5367e-07 | 9.5367e-07 |   0.0 |  0.04
 Neigh   | 0          | 0          | 0          |   0.0 |  0.00
 Comm    | 9.5367e-07 | 9.5367e-07 | 9.5367e-07 |   0.0 |  0.04
-Output  | 0.002506   | 0.002506   | 0.002506   |   0.0 | 97.67
-Modify  | 5.4121e-05 | 5.4121e-05 | 5.4121e-05 |   0.0 |  2.11
-Other   |            | 3.815e-06  |            |       |  0.15
+Output  | 0.002429   | 0.002429   | 0.002429   |   0.0 | 98.75
+Modify  | 2.5034e-05 | 2.5034e-05 | 2.5034e-05 |   0.0 |  1.02
+Other   |            | 3.815e-06  |            |       |  0.16
 
 Nlocal:    1 ave 1 max 1 min
 Histogram: 1 0 0 0 0 0 0 0 0 0

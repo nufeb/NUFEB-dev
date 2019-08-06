@@ -40,7 +40,7 @@ class DumpBioSSTL : public Dump {
   char **id_fix;             // their IDs
   class Fix **fix;           // list of ptrs to the Fix objects
 
-  int nus_flag, mass_flag, pres_flag, height_flag, ntypes_flag, volfrac_flag;
+  int nus_flag, mass_flag, pres_flag, height_flag, ntypes_flag, volfrac_flag, gridx_flag;
   int mass_header, type_header;
 
   double **vol_frac;
@@ -73,7 +73,9 @@ class DumpBioSSTL : public Dump {
   void write_pressure_data();
   void write_height_data();
   void write_volf_data(int);
+  double get_gridx(int);
   void write_sstl_model();
+  void write_gridx_data();
 
   double get_time();
   int get_global_id(int, double*);

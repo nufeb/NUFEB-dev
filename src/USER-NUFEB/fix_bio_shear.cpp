@@ -102,7 +102,7 @@ void FixShear::post_force(int vflag)
   double height = input->variable->compute_equal(ivar[2]);
 
   //argument test:
-  //printf("nevery=%i, tmin=%i, tmax=%i, viscosity=%f, rate=%f, height = %f\n", nevery, tmin, tmax, viscosity, shearRate, height);
+ // printf("nevery=%i, tmin=%i, tmax=%i, viscosity=%f, rate=%f, height = %f\n", nevery, tmin, tmax, viscosity, shearRate, height);
 
   int nlocal = atom->nlocal;
 
@@ -119,7 +119,6 @@ void FixShear::post_force(int vflag)
     f[i][1] += MY_3PI * viscosity * diameter * (shearRate * (x[i][2] - height)-v[i][1]);
     f[i][0] += MY_3PI * viscosity * diameter * (0.0 -v[i][0]);
     f[i][2] += MY_3PI * viscosity * diameter * (0.0 -v[i][2]);
-
 
     //f[i][1] += MY_3PI * viscosity * diameter * (shearRate * (x[i][2] - height));
   }

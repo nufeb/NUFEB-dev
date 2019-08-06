@@ -40,7 +40,7 @@ fix k1 all kinetics 1 30 12 24 v_diffT v_layer niter 1
 
 dump		id all custom 1 output.lammmps id type diameter x y z
 #dump		du1 all custom/vtk 1 atom_*.vtu id type diameter x y z
-dump		du2 all grid 1 grid_%_*.vti sstl surface.txt
+dump		du2 all grid 1 grid_%_*.vti sstl shear1.txt
 thermo_style    custom step cpu 
 thermo		1
 thermo_modify	lost ignore

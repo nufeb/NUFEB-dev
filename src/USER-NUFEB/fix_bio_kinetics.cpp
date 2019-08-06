@@ -153,14 +153,24 @@ FixKinetics::FixKinetics(LAMMPS *lmp, int narg, char **arg) :
   }
   subgrid = Subgrid<double, 3>(grid, Box<double, 3>(tmpsublo, tmpsubhi));
 
-  for (int i = 0; i < 3; i++) {
     // considering that the grid will always have a cubic cell (i.e. stepx = stepy = stepz)
-    subnlo[i] = tmpsublo[i] / stepz;
-    subnhi[i] = tmpsubhi[i] / stepz;
-    sublo[i] = subnlo[i] * stepz;
-    subhi[i] = subnhi[i] * stepz;
-    subn[i] = subnhi[i] - subnlo[i];
-  }
+  subnlo[0] = tmpsublo[0] / stepx;
+  subnhi[0] = tmpsubhi[0] / stepx;
+  sublo[0] = subnlo[0] * stepx;
+  subhi[0] = subnhi[0] * stepx;
+  subn[0] = subnhi[0] - subnlo[0];
+
+  subnlo[1] = tmpsublo[1] / stepy;
+  subnhi[1] = tmpsubhi[1] / stepy;
+  sublo[1] = subnlo[1] * stepy;
+  subhi[1] = subnhi[1] * stepy;
+  subn[1] = subnhi[1] - subnlo[1];
+
+  subnlo[2] = tmpsublo[2] / stepz;
+  subnhi[2] = tmpsubhi[2] / stepz;
+  sublo[2] = subnlo[2] * stepz;
+  subhi[2] = subnhi[2] * stepz;
+  subn[2] = subnhi[2] - subnlo[2];
 
   bnz = subgrid.get_box().upper[2];
   maxheight = domain->boxhi[2];
@@ -502,8 +512,8 @@ bool FixKinetics::is_inside(int i) {
  ------------------------------------------------------------------------- */
 int FixKinetics::position(int i) {
   // get index of grid containing i
-  int xpos = (atom->x[i][0] - sublo[0]) / stepz;
-  int ypos = (atom->x[i][1] - sublo[1]) / stepz;
+  int xpos = (atom->x[i][0] - sublo[0]) / stepx;
+  int ypos = (atom->x[i][1] - sublo[1]) / stepy;
   int zpos = (atom->x[i][2] - sublo[2]) / stepz;
   int pos = xpos + ypos * subn[0] + zpos * subn[0] * subn[1];
 

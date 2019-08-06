@@ -4,7 +4,7 @@ atom_style	bio
 atom_modify	map array sort 1000 5.0e-7
 boundary	pp pp ff
 newton		off
-processors 4 1 1
+processors 1 4 1
 
 comm_modify	vel yes
 read_data_bio atom.in
@@ -31,7 +31,7 @@ variable kanc equal 50
 
 fix zwa all walladh v_kanc zplane  0.000000e-04 1.000000e-04
 
-variable ke equal 5e+10
+variable ke equal 5e+9
 fix j1 all epsadh 1 v_ke 1
 
 ##############Ibm Variable Definitions##############
@@ -51,7 +51,7 @@ variable layer equal -1
 
 #variables used in fix shear
 variable viscosity equal 0.001
-variable shearRate equal 0.8
+variable shearRate equal 0.1
 variable height equal 0.0
 
 ##############Ibm compute##############
@@ -64,22 +64,21 @@ compute myBiomass all biomass
 label       loopa
 variable    a loop 1
 
-fix k1 all kinetics 100 15 10 25 v_diffT v_layer niter 3000
+fix k1 all kinetics 100 12 8 20 v_diffT v_layer niter 4000
 fix kgm all kinetics/growth/monod v_EPSdens v_etaHET
 fix g1 all kinetics/diffusion v_tol pp pp nd kg
-fix d1 all divide 100 v_EPSdens v_divDia 64332
-fix e1 HET eps_extract 100 v_EPSratio v_EPSdens 7465
+fix d1 all divide 100 v_EPSdens v_divDia 435234
+fix e1 HET eps_extract 100 v_EPSratio v_EPSdens 13157 
 
-##############Simulation outputs##############
+##########mpi####Simulation outputs##############
 
-dump		du1 all custom/vtk 2000 atom_*.vtu id type diameter x y z
-dump		du2 all grid 2000 grid_%_*.vti con
 thermo_style    custom step cpu atoms c_myNtypes[*]
 thermo		100
 thermo_modify	lost ignore
 
-run 80000
+run 85000
 
+reset_timestep 0
 timestep 2.5
 
 change_box all boundary f p f x final 0 2.000000e-04
@@ -90,13 +89,13 @@ unfix g1
 unfix d1
 unfix e1
 
-fix knew all kinetics 100 60 12 30 v_diffT v_layer niter 1
-
+fix k1 all kinetics 100 60 8 20 v_diffT v_layer niter 1
 fix s1 all shear 1 v_viscosity v_shearRate v_height zx 0 8000000
 
-dump du3 all bio/sstl 240 biomass ntypes vof
+dump du1 all custom/vtk 720 atom_*.vtu id type diameter x y z
+dump du3 all bio/sstl 720 biomass ntypes vof gridx
 
-run 300000
+run 241920
 
 next a
 jump SELF loopa
