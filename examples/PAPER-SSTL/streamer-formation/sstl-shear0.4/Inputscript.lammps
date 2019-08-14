@@ -51,7 +51,7 @@ variable layer equal -1
 
 #variables used in fix shear
 variable viscosity equal 0.001
-variable shearRate equal 0.3
+variable shearRate equal 0.4
 variable height equal 0.0
 
 ##############Ibm compute##############

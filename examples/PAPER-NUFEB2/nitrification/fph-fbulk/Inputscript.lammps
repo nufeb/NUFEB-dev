@@ -4,7 +4,7 @@ atom_style      bio
 atom_modify     map array sort 100 5.0e-7
 boundary        pp pp ff
 newton          off
-processors 5 1 10 
+processors 4 1 10 
 
 comm_modify     vel yes
 read_data_bio atom.in
@@ -95,7 +95,7 @@ thermo_style    custom step cpu atoms c_myNtypes[*]
 dump du0 all bio 10010 biomass ntypes bulk avg_con avg_ph
 dump du2 all grid 100100 grid_%_*.vti con hyd
 dump du3 all custom/vtk 100100 snapshot_*.vtu id type diameter x y z
-dump du4 all bio/hdf5 100100 dump_*.h5 id type radius x y z con cat ana hyd
+#dump du4 all bio/hdf5 100100 dump_*.h5 id type radius x y z con cat ana hyd
 thermo 1001
 thermo_modify   lost ignore
 

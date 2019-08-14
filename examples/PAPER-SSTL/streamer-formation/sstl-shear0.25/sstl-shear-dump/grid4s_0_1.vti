@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<VTKFile type="ImageData" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+  <ImageData WholeExtent="0 60 0 8 0 20" Origin="0 0 0" Spacing="3.3333333333e-06 5e-06 5e-06">
+    <Piece Extent="0 60 0 8 0 20"                                                     >
+      <PointData>
+      </PointData>
+      <CellData>
+        <DataArray type="Float64" Name="sstl" format="appended" RangeMin="0"                    RangeMax="3"                    offset="0"                   />
+      </CellData>
+    </Piece>
+  </ImageData>
+  <AppendedData encoding="base64">
+   _AwAAAACAAAAALAAAzAAAAMkAAABVAAAAeJzt1FEJAwEMBcH7rKvGv5pKqIoQ2JtR8GBJnueNPnO9gE36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36tunbpm+bvm36xs31ADa537i5HsCquR7AJv+5Td82fePmegCr5noAm37f6wVv8QejSxPgeJzt1rENgEAMBMEP6YrvvxpKIKSCx9JqpgFb2uTWmvDcI2f5ib5t157+gJP0bdO3Td+4Pf0AJ9nPbfq26dtmX7Xp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp26Zvm75t+rbp2/b1fQE7mxfkeJzt0VEJACAUwMD3aSz7pzKFCPMuwWAz9Kz9uoCb/G3zt83fNn/b/G3zt83fNn/b/G3zt83fNn/b/G3zt83fNn/b/G3zt83fNn/b/G375+8BgxUGeQ==
+  </AppendedData>
+</VTKFile>

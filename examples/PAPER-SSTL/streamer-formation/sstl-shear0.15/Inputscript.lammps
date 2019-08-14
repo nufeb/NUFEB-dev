@@ -1,0 +1,107 @@
+# NUFEB simulation
+
+atom_style	bio
+atom_modify	map array sort 1000 5.0e-7
+boundary	pp pp ff
+newton		off
+processors 1 4 1
+
+comm_modify	vel yes
+read_data_bio atom.in
+
+group HET type 1
+group EPS type 2
+
+neighbor	5e-7 bin
+neigh_modify	delay 0 one 5000
+
+##############Define DEM Variables&Commands##############
+
+pair_style  gran/hooke/history 1.e-4 NULL 1.e-5 NULL 0.0 1
+pair_coeff  * *
+
+timestep 10           
+
+fix 1 all nve/limit 1e-8 
+fix 10 all viscous 1.e-5
+
+fix yw all wall/gran hooke/history 2000 NULL 500.0 NULL 1.5 0 zplane 0 1.0e-04
+
+variable kanc equal 50
+
+fix zwa all walladh v_kanc zplane  0.000000e-04 1.000000e-04
+
+variable ke equal 5e+9
+fix j1 all epsadh 1 v_ke 1
+
+##############Ibm Variable Definitions##############
+
+#variables used in fix eps_extract
+variable EPSdens equal 30
+variable EPSratio equal 1.25
+
+#variables used in fix division
+variable divDia equal 1.36e-6
+
+#variables used in fix kinetics 
+variable diffT equal 1e-4
+variable tol equal 1e-6
+variable etaHET equal 0.0
+variable layer equal -1
+
+#variables used in fix shear
+variable viscosity equal 0.001
+variable shearRate equal 0.15
+variable height equal 0.0
+
+##############Ibm compute##############
+
+compute myNtypes all ntypes
+compute myBiomass all biomass
+
+
+##############Define IBm Commands##############
+label       loopa
+variable    a loop 1
+
+fix k1 all kinetics 100 12 8 20 v_diffT v_layer niter 4000
+fix kgm all kinetics/growth/monod v_EPSdens v_etaHET
+fix g1 all kinetics/diffusion v_tol pp pp nd kg
+fix d1 all divide 100 v_EPSdens v_divDia 435234
+fix e1 HET eps_extract 100 v_EPSratio v_EPSdens 13157 
+
+##########mpi####Simulation outputs##############
+
+thermo_style    custom step cpu atoms c_myNtypes[*]
+thermo		100
+thermo_modify	lost ignore
+
+run 85000
+
+reset_timestep 0
+timestep 2.5
+
+change_box all boundary f p f x final 0 2.000000e-04
+
+unfix k1
+unfix kgm
+unfix g1
+unfix d1
+unfix e1
+
+fix k1 all kinetics 100 60 8 20 v_diffT v_layer niter 1
+fix s1 all shear 1 v_viscosity v_shearRate v_height zx 0 8000000
+
+dump du1 all custom/vtk 720 atom_*.vtu id type diameter x y z
+dump du3 all bio/sstl 720 biomass ntypes vof gridx
+
+run 241920
+
+next a
+jump SELF loopa
+
+
+
+
+
+

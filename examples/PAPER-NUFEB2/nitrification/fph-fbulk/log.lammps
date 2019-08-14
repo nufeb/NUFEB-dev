@@ -1,0 +1,3571 @@
+LAMMPS (5 Nov 2016)
+# NUFEB simulation
+units si
+atom_style      bio
+atom_modify     map array sort 100 5.0e-7
+boundary        pp pp ff
+newton          off
+processors 4 1 1
+
+comm_modify     vel yes
+read_data_bio atom.in
+  orthogonal box = (0 0 0) to (0.0001 2e-05 0.0003)
+  4 by 1 by 1 MPI processor grid
+  reading atoms ...
+  0 atoms
+  7 nutrients
+
+group AOB type 1
+0 atoms in group AOB
+group NOB type 2
+0 atoms in group NOB
+group DEAD type 3
+0 atoms in group DEAD
+
+##############Define initial particle distribution##############
+
+lattice custom 1.25e-6 a1 2 0 0 a2 0 1 0 a3 0 0 1 basis 0.6 0.5 0.5
+Lattice spacing in x,y,z = 2.5e-06 1.25e-06 1.25e-06
+region reg block 0 40 0 16 0 8
+create_atoms 1 region reg
+Created 5120 atoms
+
+lattice custom 1.25e-6 a1 2 0 0 a2 0 1 0 a3 0 0 1 basis 0.1 0.5 0.5
+Lattice spacing in x,y,z = 2.5e-06 1.25e-06 1.25e-06
+region reg2 block 0 40 0 16 0 8
+create_atoms 2 region reg2
+Created 5120 atoms
+
+set type 1 density 290
+  5120 settings made for density
+set type 1 diameter 1.2e-6
+  5120 settings made for diameter
+set type 2 density 290
+  5120 settings made for density
+set type 2 diameter 1.2e-6
+  5120 settings made for diameter
+set type 1 mass 2.62e-16
+  5120 settings made for mass
+set type 2 mass 2.62e-16
+  5120 settings made for mass
+
+lattice sc 1e-5 origin 0 0 0
+Lattice spacing in x,y,z = 1e-05 1e-05 1e-05
+region reg3 block 0 10 0 2 25 28
+
+neighbor        5e-7 bin
+neigh_modify    delay 0 one 5000
+
+##############Define DEM Variables&Commands##############
+
+pair_style  gran/hooke/history 1.e-4 NULL 1.e-5 NULL 0.0 1
+pair_coeff  * *
+
+timestep 720
+
+fix 1 all nve/limit 1e-7
+fix fv all viscous 1e-5
+
+fix zw all wall/gran hooke/history 2000 NULL 500 NULL 1.5 0 zplane  0.0  3e-04
+
+variable kanc equal 0
+fix zwa all walladh v_kanc zplane  0.0   3e-04
+
+variable ke equal 5e+9
+#fix j1 all epsadh 1 v_ke 1
+
+##############Ibm Variable Definitions##############
+
+#Defining EPS density and ratio variables
+variable EPSdens equal 30
+variable EPSratio equal 1.25
+
+#variables used in fix division
+variable divDia equal 1.25e-6
+
+#Defining diffusion variables
+variable diffT equal 1e-4
+variable tol equal 1e-7
+variable etaHET equal 0.0
+variable layer equal 4e-5
+
+#variables used in fix death
+variable deadDia equal 5.85e-7
+
+##############Ibm functions##############
+
+fix k1 all kinetics 1 50 10 150 v_diffT v_layer demflag 0 niter 1 devery 10
+fix ki3 all kinetics/ph fix ph 7.5
+fix ki2 all kinetics/thermo
+fix ki1 all kinetics/growth/energy v_EPSdens
+fix g1 all kinetics/diffusion v_tol pp pp nd mol dcflag 2
+fix d1 all divide 1 v_EPSdens v_divDia 31231 demflag 0
+fix d2 all death 1 v_deadDia demflag 0
+
+##############Ibm compute##############
+
+compute myNtypes all ntypes
+compute myMass all biomass
+compute myAvgs all avg_con
+compute myPh all avg_ph
+
+##############Simulation outputs##############
+
+thermo_style    custom step cpu atoms c_myNtypes[*]
+dump du0 all bio 10010 biomass ntypes bulk avg_con avg_ph
+dump du2 all grid 100100 grid_%_*.vti con hyd
+dump du3 all custom/vtk 100100 snapshot_*.vtu id type diameter x y z
+#dump du4 all bio/hdf5 100100 dump_*.h5 id type radius x y z con cat ana hyd
+thermo 1001
+thermo_modify   lost ignore
+
+##############Define Bio-loop and DEM-subloop##############
+
+run 12000 pre no post no every 1 "fix_modify k1 demflag 1" "fix_modify d2 demflag 1" "fix_modify d1 demflag 1" "delete_atoms region reg3" "timestep 0.1" "run 1000 pre no post no" "timestep 720" "fix_modify k1 demflag 0" "fix_modify d2 demflag 0" "fix_modify d1 demflag 0"
+Neighbor list info ...
+  2 neighbor list requests
+  update every 1 steps, delay 0 steps, check yes
+  max neighbors/atom: 5000, page size: 100000
+  master list distance cutoff = 1.7e-06
+  ghost atom cutoff = 1.7e-06
+  binsize = 8.5e-07 -> bins = 118 24 353
+Memory usage per processor = 9.22378 Mbytes
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+       0            0    10240            0         5120         5120            0 
+number of iterations: 1 
+       1 0.0083611012    10240            0         5120         5120            0 
+Loop time of 0.00838959 on 4 procs for 1 steps with 10240 atoms
+
+87.2% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+       1            0    10240            0         5120         5120            0 
+    1001   0.26309705    10240            0         5120         5120            0 
+Loop time of 0.26312 on 4 procs for 1000 steps with 10240 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    1001            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    1002  0.010241032    10240            0         5120         5120            0 
+Loop time of 0.010263 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    1002            0    10240            0         5120         5120            0 
+    2002   0.20926118    10240            0         5120         5120            0 
+Loop time of 0.209283 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    2002            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    2003  0.010650873    10240            0         5120         5120            0 
+Loop time of 0.0106778 on 4 procs for 1 steps with 10240 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    2003            0    10240            0         5120         5120            0 
+    3003   0.21870899    10240            0         5120         5120            0 
+Loop time of 0.21873 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    3003            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    3004  0.010467052    10240            0         5120         5120            0 
+Loop time of 0.0104907 on 4 procs for 1 steps with 10240 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    3004            0    10240            0         5120         5120            0 
+    4004   0.21842098    10240            0         5120         5120            0 
+Loop time of 0.218447 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    4004            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    4005  0.010321856    10240            0         5120         5120            0 
+Loop time of 0.0103567 on 4 procs for 1 steps with 10240 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    4005            0    10240            0         5120         5120            0 
+    5005   0.22060895    10240            0         5120         5120            0 
+Loop time of 0.22064 on 4 procs for 1000 steps with 10240 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    5005            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    5006 0.0093638897    10240            0         5120         5120            0 
+Loop time of 0.00938392 on 4 procs for 1 steps with 10240 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    5006            0    10240            0         5120         5120            0 
+    6006   0.21591806    10240            0         5120         5120            0 
+Loop time of 0.215943 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    6006            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    6007  0.010756016    10240            0         5120         5120            0 
+Loop time of 0.0107777 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    6007            0    10240            0         5120         5120            0 
+    7007   0.21198821    10240            0         5120         5120            0 
+Loop time of 0.212015 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    7007            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    7008  0.010050058    10240            0         5120         5120            0 
+Loop time of 0.0100801 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    7008            0    10240            0         5120         5120            0 
+    8008    0.1994791    10240            0         5120         5120            0 
+Loop time of 0.199502 on 4 procs for 1000 steps with 10240 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    8008            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    8009  0.010402918    10240            0         5120         5120            0 
+Loop time of 0.0104256 on 4 procs for 1 steps with 10240 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    8009            0    10240            0         5120         5120            0 
+    9009   0.19995713    10240            0         5120         5120            0 
+Loop time of 0.199983 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    9009            0    10240            0         5120         5120            0 
+number of iterations: 1 
+    9010 0.0094759464    10240            0         5120         5120            0 
+Loop time of 0.00949693 on 4 procs for 1 steps with 10240 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+    9010            0    10240            0         5120         5120            0 
+   10010   0.20120788    10240            0         5120         5120            0 
+Loop time of 0.201229 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   10010            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   10011 0.0099520683    10240            0         5120         5120            0 
+Loop time of 0.00997144 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   10011            0    10240            0         5120         5120            0 
+   11011   0.20074701    10240            0         5120         5120            0 
+Loop time of 0.200769 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   11011            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   11012  0.010987997    10240            0         5120         5120            0 
+Loop time of 0.0110135 on 4 procs for 1 steps with 10240 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   11012            0    10240            0         5120         5120            0 
+   12012   0.20209599    10240            0         5120         5120            0 
+Loop time of 0.20212 on 4 procs for 1000 steps with 10240 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   12012            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   12013  0.010346889    10240            0         5120         5120            0 
+Loop time of 0.0103681 on 4 procs for 1 steps with 10240 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   12013            0    10240            0         5120         5120            0 
+   13013   0.20194888    10240            0         5120         5120            0 
+Loop time of 0.201976 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   13013            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   13014 0.0089809895    10240            0         5120         5120            0 
+Loop time of 0.00899673 on 4 procs for 1 steps with 10240 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   13014            0    10240            0         5120         5120            0 
+   14014   0.20258689    10240            0         5120         5120            0 
+Loop time of 0.202615 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   14014            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   14015  0.010102034    10240            0         5120         5120            0 
+Loop time of 0.0101202 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   14015            0    10240            0         5120         5120            0 
+   15015   0.19956613    10240            0         5120         5120            0 
+Loop time of 0.19959 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   15015            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   15016  0.010463953    10240            0         5120         5120            0 
+Loop time of 0.0104866 on 4 procs for 1 steps with 10240 atoms
+
+99.3% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   15016            0    10240            0         5120         5120            0 
+   16016   0.20354486    10240            0         5120         5120            0 
+Loop time of 0.20357 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   16016            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   16017  0.010818005    10240            0         5120         5120            0 
+Loop time of 0.0108429 on 4 procs for 1 steps with 10240 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   16017            0    10240            0         5120         5120            0 
+   17017   0.19864106    10240            0         5120         5120            0 
+Loop time of 0.198671 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   17017            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   17018  0.010715008    10240            0         5120         5120            0 
+Loop time of 0.0107325 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   17018            0    10240            0         5120         5120            0 
+   18018   0.20256114    10240            0         5120         5120            0 
+Loop time of 0.202589 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   18018            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   18019  0.010549068    10240            0         5120         5120            0 
+Loop time of 0.0105681 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   18019            0    10240            0         5120         5120            0 
+   19019     0.206141    10240            0         5120         5120            0 
+Loop time of 0.206165 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   19019            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   19020  0.010757208    10240            0         5120         5120            0 
+Loop time of 0.0107775 on 4 procs for 1 steps with 10240 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   19020            0    10240            0         5120         5120            0 
+   20020   0.19849992    10240            0         5120         5120            0 
+Loop time of 0.198519 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   20020            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   20021  0.010244846    10240            0         5120         5120            0 
+Loop time of 0.0102652 on 4 procs for 1 steps with 10240 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 10240
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   20021            0    10240            0         5120         5120            0 
+   21021   0.56649208    10240            0         5120         5120            0 
+Loop time of 0.566526 on 4 procs for 1000 steps with 10240 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   21021            0    10240            0         5120         5120            0 
+number of iterations: 1 
+   21022   0.01220417    15360            0        10240         5120            0 
+Loop time of 0.0122315 on 4 procs for 1 steps with 15360 atoms
+
+91.6% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   21022            0    15360            0        10240         5120            0 
+   22022    1.4579298    15360            0        10240         5120            0 
+Loop time of 1.45796 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   22022            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   22023  0.012479782    15360            0        10240         5120            0 
+Loop time of 0.0125096 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   22023            0    15360            0        10240         5120            0 
+   23023   0.95830083    15360            0        10240         5120            0 
+Loop time of 0.958333 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   23023            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   23024  0.015573978    15360            0        10240         5120            0 
+Loop time of 0.0155959 on 4 procs for 1 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   23024            0    15360            0        10240         5120            0 
+   24024    1.0197191    15360            0        10240         5120            0 
+Loop time of 1.01974 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   24024            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   24025  0.012036085    15360            0        10240         5120            0 
+Loop time of 0.0120603 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   24025            0    15360            0        10240         5120            0 
+   25025     1.097434    15360            0        10240         5120            0 
+Loop time of 1.09746 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   25025            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   25026  0.012207031    15360            0        10240         5120            0 
+Loop time of 0.0122292 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   25026            0    15360            0        10240         5120            0 
+   26026     1.050313    15360            0        10240         5120            0 
+Loop time of 1.05035 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   26026            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   26027  0.015923023    15360            0        10240         5120            0 
+Loop time of 0.0159469 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   26027            0    15360            0        10240         5120            0 
+   27027    1.1064432    15360            0        10240         5120            0 
+Loop time of 1.10647 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   27027            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   27028  0.011645079    15360            0        10240         5120            0 
+Loop time of 0.0116725 on 4 procs for 1 steps with 15360 atoms
+
+91.2% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   27028            0    15360            0        10240         5120            0 
+   28028    1.1627181    15360            0        10240         5120            0 
+Loop time of 1.16276 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   28028            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   28029  0.012372971    15360            0        10240         5120            0 
+Loop time of 0.012399 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   28029            0    15360            0        10240         5120            0 
+   29029     1.170481    15360            0        10240         5120            0 
+Loop time of 1.17052 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   29029            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   29030    0.0107131    15360            0        10240         5120            0 
+Loop time of 0.0107401 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   29030            0    15360            0        10240         5120            0 
+   30030    1.1452169    15360            0        10240         5120            0 
+Loop time of 1.14524 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   30030            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   30031  0.011997938    15360            0        10240         5120            0 
+Loop time of 0.0120224 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   30031            0    15360            0        10240         5120            0 
+   31031    1.1165121    15360            0        10240         5120            0 
+Loop time of 1.11654 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   31031            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   31032  0.010776997    15360            0        10240         5120            0 
+Loop time of 0.0108056 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   31032            0    15360            0        10240         5120            0 
+   32032    1.0905499    15360            0        10240         5120            0 
+Loop time of 1.09058 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   32032            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   32033   0.01178503    15360            0        10240         5120            0 
+Loop time of 0.0118099 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   32033            0    15360            0        10240         5120            0 
+   33033    1.0783379    15360            0        10240         5120            0 
+Loop time of 1.07837 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   33033            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   33034  0.011513948    15360            0        10240         5120            0 
+Loop time of 0.011536 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   33034            0    15360            0        10240         5120            0 
+   34034    1.1202669    15360            0        10240         5120            0 
+Loop time of 1.1203 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   34034            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   34035  0.011209011    15360            0        10240         5120            0 
+Loop time of 0.011236 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   34035            0    15360            0        10240         5120            0 
+   35035    1.1105189    15360            0        10240         5120            0 
+Loop time of 1.11055 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   35035            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   35036  0.010755062    15360            0        10240         5120            0 
+Loop time of 0.010776 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   35036            0    15360            0        10240         5120            0 
+   36036    1.1483319    15360            0        10240         5120            0 
+Loop time of 1.14836 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   36036            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   36037  0.010808945    15360            0        10240         5120            0 
+Loop time of 0.010829 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   36037            0    15360            0        10240         5120            0 
+   37037    1.2272348    15360            0        10240         5120            0 
+Loop time of 1.22727 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   37037            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   37038  0.011095047    15360            0        10240         5120            0 
+Loop time of 0.0111197 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   37038            0    15360            0        10240         5120            0 
+   38038    1.1760781    15360            0        10240         5120            0 
+Loop time of 1.1761 on 4 procs for 1000 steps with 15360 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   38038            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   38039  0.011966944    15360            0        10240         5120            0 
+Loop time of 0.0119865 on 4 procs for 1 steps with 15360 atoms
+
+91.4% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   38039            0    15360            0        10240         5120            0 
+   39039    1.0642409    15360            0        10240         5120            0 
+Loop time of 1.06427 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   39039            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   39040  0.010948896    15360            0        10240         5120            0 
+Loop time of 0.0109723 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   39040            0    15360            0        10240         5120            0 
+   40040     1.041111    15360            0        10240         5120            0 
+Loop time of 1.04113 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   40040            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   40041  0.010802984    15360            0        10240         5120            0 
+Loop time of 0.0108294 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   40041            0    15360            0        10240         5120            0 
+   41041    1.1365309    15360            0        10240         5120            0 
+Loop time of 1.13657 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   41041            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   41042  0.010968924    15360            0        10240         5120            0 
+Loop time of 0.0109978 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   41042            0    15360            0        10240         5120            0 
+   42042    1.1657841    15360            0        10240         5120            0 
+Loop time of 1.16582 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   42042            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   42043  0.015869141    15360            0        10240         5120            0 
+Loop time of 0.0158898 on 4 procs for 1 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   42043            0    15360            0        10240         5120            0 
+   43043    1.1518791    15360            0        10240         5120            0 
+Loop time of 1.15191 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   43043            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   43044  0.011662006    15360            0        10240         5120            0 
+Loop time of 0.0116843 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   43044            0    15360            0        10240         5120            0 
+   44044     1.250787    15360            0        10240         5120            0 
+Loop time of 1.25082 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   44044            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   44045  0.011486053    15360            0        10240         5120            0 
+Loop time of 0.0115068 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   44045            0    15360            0        10240         5120            0 
+   45045    1.2739861    15360            0        10240         5120            0 
+Loop time of 1.27402 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   45045            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   45046  0.012473106    15360            0        10240         5120            0 
+Loop time of 0.0124983 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   45046            0    15360            0        10240         5120            0 
+   46046     1.238517    15360            0        10240         5120            0 
+Loop time of 1.23855 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   46046            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   46047  0.011023998    15360            0        10240         5120            0 
+Loop time of 0.0110461 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   46047            0    15360            0        10240         5120            0 
+   47047    1.3995509    15360            0        10240         5120            0 
+Loop time of 1.39958 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   47047            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   47048  0.013197899    15360            0        10240         5120            0 
+Loop time of 0.0132225 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   47048            0    15360            0        10240         5120            0 
+   48048    1.4001238    15360            0        10240         5120            0 
+Loop time of 1.40015 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   48048            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   48049  0.012207985    15360            0        10240         5120            0 
+Loop time of 0.01223 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   48049            0    15360            0        10240         5120            0 
+   49049    1.1918719    15360            0        10240         5120            0 
+Loop time of 1.1919 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   49049            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   49050  0.010829926    15360            0        10240         5120            0 
+Loop time of 0.010855 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   49050            0    15360            0        10240         5120            0 
+   50050    1.3421991    15360            0        10240         5120            0 
+Loop time of 1.34223 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   50050            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   50051  0.014815807    15360            0        10240         5120            0 
+Loop time of 0.0148404 on 4 procs for 1 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   50051            0    15360            0        10240         5120            0 
+   51051     1.273608    15360            0        10240         5120            0 
+Loop time of 1.27363 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   51051            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   51052  0.011288881    15360            0        10240         5120            0 
+Loop time of 0.0113143 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   51052            0    15360            0        10240         5120            0 
+   52052    1.1676431    15360            0        10240         5120            0 
+Loop time of 1.16769 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   52052            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   52053  0.010716915    15360            0        10240         5120            0 
+Loop time of 0.0107436 on 4 procs for 1 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   52053            0    15360            0        10240         5120            0 
+   53053     1.297035    15360            0        10240         5120            0 
+Loop time of 1.29706 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   53053            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   53054   0.01154685    15360            0        10240         5120            0 
+Loop time of 0.0115654 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   53054            0    15360            0        10240         5120            0 
+   54054     1.137295    15360            0        10240         5120            0 
+Loop time of 1.13732 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   54054            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   54055  0.011928082    15360            0        10240         5120            0 
+Loop time of 0.0119522 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   54055            0    15360            0        10240         5120            0 
+   55055    1.1133108    15360            0        10240         5120            0 
+Loop time of 1.11334 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   55055            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   55056  0.010909081    15360            0        10240         5120            0 
+Loop time of 0.0109348 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   55056            0    15360            0        10240         5120            0 
+   56056    1.1506801    15360            0        10240         5120            0 
+Loop time of 1.15071 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   56056            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   56057  0.011086941    15360            0        10240         5120            0 
+Loop time of 0.0111137 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   56057            0    15360            0        10240         5120            0 
+   57057    1.1983871    15360            0        10240         5120            0 
+Loop time of 1.19841 on 4 procs for 1000 steps with 15360 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   57057            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   57058  0.011948109    15360            0        10240         5120            0 
+Loop time of 0.011972 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   57058            0    15360            0        10240         5120            0 
+   58058    1.1583481    15360            0        10240         5120            0 
+Loop time of 1.15838 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   58058            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   58059  0.011996984    15360            0        10240         5120            0 
+Loop time of 0.0120189 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   58059            0    15360            0        10240         5120            0 
+   59059      1.21382    15360            0        10240         5120            0 
+Loop time of 1.21385 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   59059            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   59060  0.011430979    15360            0        10240         5120            0 
+Loop time of 0.0114592 on 4 procs for 1 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   59060            0    15360            0        10240         5120            0 
+   60060    1.1953611    15360            0        10240         5120            0 
+Loop time of 1.19539 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   60060            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   60061  0.010514021    15360            0        10240         5120            0 
+Loop time of 0.0105384 on 4 procs for 1 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   60061            0    15360            0        10240         5120            0 
+   61061     1.210171    15360            0        10240         5120            0 
+Loop time of 1.2102 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   61061            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   61062  0.010968924    15360            0        10240         5120            0 
+Loop time of 0.0109938 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   61062            0    15360            0        10240         5120            0 
+   62062     1.138947    15360            0        10240         5120            0 
+Loop time of 1.13898 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   62062            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   62063  0.011808157    15360            0        10240         5120            0 
+Loop time of 0.0118318 on 4 procs for 1 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   62063            0    15360            0        10240         5120            0 
+   63063    1.1729429    15360            0        10240         5120            0 
+Loop time of 1.17297 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   63063            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   63064  0.011486053    15360            0        10240         5120            0 
+Loop time of 0.0115104 on 4 procs for 1 steps with 15360 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   63064            0    15360            0        10240         5120            0 
+   64064    1.2185011    15360            0        10240         5120            0 
+Loop time of 1.21853 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   64064            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   64065  0.012417793    15360            0        10240         5120            0 
+Loop time of 0.0124412 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   64065            0    15360            0        10240         5120            0 
+   65065    1.1572618    15360            0        10240         5120            0 
+Loop time of 1.15729 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   65065            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   65066  0.011615038    15360            0        10240         5120            0 
+Loop time of 0.0116451 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   65066            0    15360            0        10240         5120            0 
+   66066    1.2057199    15360            0        10240         5120            0 
+Loop time of 1.20575 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   66066            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   66067  0.011878967    15360            0        10240         5120            0 
+Loop time of 0.0119011 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   66067            0    15360            0        10240         5120            0 
+   67067    1.2090039    15360            0        10240         5120            0 
+Loop time of 1.20904 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   67067            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   67068  0.010663033    15360            0        10240         5120            0 
+Loop time of 0.010684 on 4 procs for 1 steps with 15360 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   67068            0    15360            0        10240         5120            0 
+   68068    1.1906099    15360            0        10240         5120            0 
+Loop time of 1.19063 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   68068            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   68069  0.010491848    15360            0        10240         5120            0 
+Loop time of 0.0105147 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   68069            0    15360            0        10240         5120            0 
+   69069     1.219224    15360            0        10240         5120            0 
+Loop time of 1.21926 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   69069            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   69070  0.010937929    15360            0        10240         5120            0 
+Loop time of 0.0109611 on 4 procs for 1 steps with 15360 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   69070            0    15360            0        10240         5120            0 
+   70070    1.2267849    15360            0        10240         5120            0 
+Loop time of 1.22681 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   70070            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   70071  0.011044025    15360            0        10240         5120            0 
+Loop time of 0.0110657 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   70071            0    15360            0        10240         5120            0 
+   71071    1.1421061    15360            0        10240         5120            0 
+Loop time of 1.14213 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   71071            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   71072  0.012006998    15360            0        10240         5120            0 
+Loop time of 0.0120307 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   71072            0    15360            0        10240         5120            0 
+   72072    1.1997209    15360            0        10240         5120            0 
+Loop time of 1.19975 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   72072            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   72073  0.010948896    15360            0        10240         5120            0 
+Loop time of 0.0109801 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   72073            0    15360            0        10240         5120            0 
+   73073    1.2096369    15360            0        10240         5120            0 
+Loop time of 1.20966 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   73073            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   73074  0.012001991    15360            0        10240         5120            0 
+Loop time of 0.0120298 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   73074            0    15360            0        10240         5120            0 
+   74074     1.223264    15360            0        10240         5120            0 
+Loop time of 1.2233 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   74074            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   74075  0.012259007    15360            0        10240         5120            0 
+Loop time of 0.0122845 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   74075            0    15360            0        10240         5120            0 
+   75075    1.2643211    15360            0        10240         5120            0 
+Loop time of 1.26435 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   75075            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   75076  0.011932135    15360            0        10240         5120            0 
+Loop time of 0.0119634 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   75076            0    15360            0        10240         5120            0 
+   76076    1.2469611    15360            0        10240         5120            0 
+Loop time of 1.24699 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   76076            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   76077  0.011936903    15360            0        10240         5120            0 
+Loop time of 0.011965 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   76077            0    15360            0        10240         5120            0 
+   77077    1.2272599    15360            0        10240         5120            0 
+Loop time of 1.22729 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   77077            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   77078  0.012579918    15360            0        10240         5120            0 
+Loop time of 0.0126038 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   77078            0    15360            0        10240         5120            0 
+   78078    1.1908951    15360            0        10240         5120            0 
+Loop time of 1.19092 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   78078            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   78079  0.012140989    15360            0        10240         5120            0 
+Loop time of 0.012162 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   78079            0    15360            0        10240         5120            0 
+   79079    1.1816449    15360            0        10240         5120            0 
+Loop time of 1.18168 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   79079            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   79080  0.011137009    15360            0        10240         5120            0 
+Loop time of 0.0111668 on 4 procs for 1 steps with 15360 atoms
+
+90.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   79080            0    15360            0        10240         5120            0 
+   80080    1.1969771    15360            0        10240         5120            0 
+Loop time of 1.197 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   80080            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   80081  0.011884928    15360            0        10240         5120            0 
+Loop time of 0.011909 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   80081            0    15360            0        10240         5120            0 
+   81081     1.200007    15360            0        10240         5120            0 
+Loop time of 1.20003 on 4 procs for 1000 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   81081            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   81082  0.011242151    15360            0        10240         5120            0 
+Loop time of 0.0112703 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   81082            0    15360            0        10240         5120            0 
+   82082     1.188843    15360            0        10240         5120            0 
+Loop time of 1.18887 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   82082            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   82083  0.011140108    15360            0        10240         5120            0 
+Loop time of 0.0111623 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   82083            0    15360            0        10240         5120            0 
+   83083    1.2015629    15360            0        10240         5120            0 
+Loop time of 1.20159 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   83083            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   83084  0.011868954    15360            0        10240         5120            0 
+Loop time of 0.0118909 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   83084            0    15360            0        10240         5120            0 
+   84084    1.2184219    15360            0        10240         5120            0 
+Loop time of 1.21846 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   84084            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   84085     0.010885    15360            0        10240         5120            0 
+Loop time of 0.0109115 on 4 procs for 1 steps with 15360 atoms
+
+99.4% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   84085            0    15360            0        10240         5120            0 
+   85085     1.180547    15360            0        10240         5120            0 
+Loop time of 1.18058 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   85085            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   85086  0.011387825    15360            0        10240         5120            0 
+Loop time of 0.0114114 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   85086            0    15360            0        10240         5120            0 
+   86086     1.176172    15360            0        10240         5120            0 
+Loop time of 1.17621 on 4 procs for 1000 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   86086            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   86087  0.011726856    15360            0        10240         5120            0 
+Loop time of 0.0117497 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   86087            0    15360            0        10240         5120            0 
+   87087     1.219734    15360            0        10240         5120            0 
+Loop time of 1.21977 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   87087            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   87088  0.011951923    15360            0        10240         5120            0 
+Loop time of 0.0119777 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   87088            0    15360            0        10240         5120            0 
+   88088    1.1620021    15360            0        10240         5120            0 
+Loop time of 1.16203 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   88088            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   88089  0.012741089    15360            0        10240         5120            0 
+Loop time of 0.0127665 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   88089            0    15360            0        10240         5120            0 
+   89089     1.175931    15360            0        10240         5120            0 
+Loop time of 1.17596 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   89089            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   89090  0.010792971    15360            0        10240         5120            0 
+Loop time of 0.0108221 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   89090            0    15360            0        10240         5120            0 
+   90090     1.200922    15360            0        10240         5120            0 
+Loop time of 1.20095 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   90090            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   90091  0.011753798    15360            0        10240         5120            0 
+Loop time of 0.0117736 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   90091            0    15360            0        10240         5120            0 
+   91091    1.2194941    15360            0        10240         5120            0 
+Loop time of 1.21952 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   91091            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   91092  0.011713982    15360            0        10240         5120            0 
+Loop time of 0.0117338 on 4 procs for 1 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   91092            0    15360            0        10240         5120            0 
+   92092    1.2498622    15360            0        10240         5120            0 
+Loop time of 1.24989 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   92092            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   92093  0.012037039    15360            0        10240         5120            0 
+Loop time of 0.012064 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   92093            0    15360            0        10240         5120            0 
+   93093     1.290596    15360            0        10240         5120            0 
+Loop time of 1.29063 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   93093            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   93094  0.011888981    15360            0        10240         5120            0 
+Loop time of 0.0119116 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   93094            0    15360            0        10240         5120            0 
+   94094      1.33919    15360            0        10240         5120            0 
+Loop time of 1.33922 on 4 procs for 1000 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   94094            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   94095  0.012217999    15360            0        10240         5120            0 
+Loop time of 0.0122462 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   94095            0    15360            0        10240         5120            0 
+   95095     1.385319    15360            0        10240         5120            0 
+Loop time of 1.38535 on 4 procs for 1000 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   95095            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   95096  0.012314081    15360            0        10240         5120            0 
+Loop time of 0.0123413 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   95096            0    15360            0        10240         5120            0 
+   96096    1.3949568    15360            0        10240         5120            0 
+Loop time of 1.39499 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   96096            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   96097   0.01276803    15360            0        10240         5120            0 
+Loop time of 0.0127922 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   96097            0    15360            0        10240         5120            0 
+   97097     1.375304    15360            0        10240         5120            0 
+Loop time of 1.37533 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   97097            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   97098  0.011305809    15360            0        10240         5120            0 
+Loop time of 0.0113339 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   97098            0    15360            0        10240         5120            0 
+   98098    1.3305469    15360            0        10240         5120            0 
+Loop time of 1.33057 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   98098            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   98099  0.011064053    15360            0        10240         5120            0 
+Loop time of 0.0110896 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   98099            0    15360            0        10240         5120            0 
+   99099    1.3467951    15360            0        10240         5120            0 
+Loop time of 1.34683 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   99099            0    15360            0        10240         5120            0 
+number of iterations: 1 
+   99100  0.016558886    15360            0        10240         5120            0 
+Loop time of 0.0165863 on 4 procs for 1 steps with 15360 atoms
+
+94.6% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+   99100            0    15360            0        10240         5120            0 
+  100100     1.527951    15360            0        10240         5120            0 
+Loop time of 1.52797 on 4 procs for 1000 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  100100            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  100101  0.015263081    15360            0        10240         5120            0 
+Loop time of 0.0152833 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  100101            0    15360            0        10240         5120            0 
+  101101    1.2103341    15360            0        10240         5120            0 
+Loop time of 1.21044 on 4 procs for 1000 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  101101            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  101102  0.017819166    15360            0        10240         5120            0 
+Loop time of 0.0178497 on 4 procs for 1 steps with 15360 atoms
+
+99.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  101102            0    15360            0        10240         5120            0 
+  102102    1.3100588    15360            0        10240         5120            0 
+Loop time of 1.31009 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  102102            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  102103  0.015190125    15360            0        10240         5120            0 
+Loop time of 0.01521 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  102103            0    15360            0        10240         5120            0 
+  103103    1.1205971    15360            0        10240         5120            0 
+Loop time of 1.12063 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  103103            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  103104  0.014978886    15360            0        10240         5120            0 
+Loop time of 0.0149992 on 4 procs for 1 steps with 15360 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  103104            0    15360            0        10240         5120            0 
+  104104    1.4109292    15360            0        10240         5120            0 
+Loop time of 1.41095 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  104104            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  104105 0.0099418163    15360            0        10240         5120            0 
+Loop time of 0.009969 on 4 procs for 1 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  104105            0    15360            0        10240         5120            0 
+  105105     1.141679    15360            0        10240         5120            0 
+Loop time of 1.14171 on 4 procs for 1000 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  105105            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  105106  0.018525839    15360            0        10240         5120            0 
+Loop time of 0.0185747 on 4 procs for 1 steps with 15360 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  105106            0    15360            0        10240         5120            0 
+  106106    1.4056931    15360            0        10240         5120            0 
+Loop time of 1.40574 on 4 procs for 1000 steps with 15360 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  106106            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  106107  0.018263102    15360            0        10240         5120            0 
+Loop time of 0.0182872 on 4 procs for 1 steps with 15360 atoms
+
+99.6% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15360
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  106107            0    15360            0        10240         5120            0 
+  107107    1.4306839    15360            0        10240         5120            0 
+Loop time of 1.43072 on 4 procs for 1000 steps with 15360 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  107107            0    15360            0        10240         5120            0 
+number of iterations: 1 
+  107108  0.015183926    15432            0        10312         5120            0 
+Loop time of 0.0152144 on 4 procs for 1 steps with 15432 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15432
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  107108            0    15432            0        10312         5120            0 
+  108108    1.5973101    15432            0        10312         5120            0 
+Loop time of 1.59734 on 4 procs for 1000 steps with 15432 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  108108            0    15432            0        10312         5120            0 
+number of iterations: 1 
+  108109  0.018098831    15564            0        10444         5120            0 
+Loop time of 0.0181215 on 4 procs for 1 steps with 15564 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15564
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  108109            0    15564            0        10444         5120            0 
+  109109    1.4963341    15564            0        10444         5120            0 
+Loop time of 1.49637 on 4 procs for 1000 steps with 15564 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  109109            0    15564            0        10444         5120            0 
+number of iterations: 1 
+  109110  0.017709017    15688            0        10568         5120            0 
+Loop time of 0.0177402 on 4 procs for 1 steps with 15688 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15688
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  109110            0    15688            0        10568         5120            0 
+  110110     1.562001    15688            0        10568         5120            0 
+Loop time of 1.56204 on 4 procs for 1000 steps with 15688 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  110110            0    15688            0        10568         5120            0 
+number of iterations: 1 
+  110111  0.014765024    15884            0        10764         5120            0 
+Loop time of 0.0147977 on 4 procs for 1 steps with 15884 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 15884
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  110111            0    15884            0        10764         5120            0 
+  111111    1.4570699    15884            0        10764         5120            0 
+Loop time of 1.45711 on 4 procs for 1000 steps with 15884 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  111111            0    15884            0        10764         5120            0 
+number of iterations: 1 
+  111112  0.011675119    16070            0        10950         5120            0 
+Loop time of 0.0117016 on 4 procs for 1 steps with 16070 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 16070
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  111112            0    16070            0        10950         5120            0 
+  112112      1.59412    16070            0        10950         5120            0 
+Loop time of 1.59415 on 4 procs for 1000 steps with 16070 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  112112            0    16070            0        10950         5120            0 
+number of iterations: 1 
+  112113  0.010363102    16200            0        11080         5120            0 
+Loop time of 0.0103872 on 4 procs for 1 steps with 16200 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 16200
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  112113            0    16200            0        11080         5120            0 
+  113113     1.246958    16200            0        11080         5120            0 
+Loop time of 1.24699 on 4 procs for 1000 steps with 16200 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  113113            0    16200            0        11080         5120            0 
+number of iterations: 1 
+  113114  0.010794878    16400            0        11280         5120            0 
+Loop time of 0.0108316 on 4 procs for 1 steps with 16400 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 16400
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  113114            0    16400            0        11280         5120            0 
+  114114     1.260421    16400            0        11280         5120            0 
+Loop time of 1.26045 on 4 procs for 1000 steps with 16400 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  114114            0    16400            0        11280         5120            0 
+number of iterations: 1 
+  114115  0.013031006    16578            0        11458         5120            0 
+Loop time of 0.0130602 on 4 procs for 1 steps with 16578 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 16578
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  114115            0    16578            0        11458         5120            0 
+  115115    1.5483389    16578            0        11458         5120            0 
+Loop time of 1.54837 on 4 procs for 1000 steps with 16578 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  115115            0    16578            0        11458         5120            0 
+number of iterations: 1 
+  115116  0.011863947    16784            0        11664         5120            0 
+Loop time of 0.011893 on 4 procs for 1 steps with 16784 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 16784
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  115116            0    16784            0        11664         5120            0 
+  116116       1.3306    16784            0        11664         5120            0 
+Loop time of 1.33063 on 4 procs for 1000 steps with 16784 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  116116            0    16784            0        11664         5120            0 
+number of iterations: 1 
+  116117  0.011080027    16958            0        11838         5120            0 
+Loop time of 0.0111096 on 4 procs for 1 steps with 16958 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 16958
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  116117            0    16958            0        11838         5120            0 
+  117117     1.265758    16958            0        11838         5120            0 
+Loop time of 1.26579 on 4 procs for 1000 steps with 16958 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  117117            0    16958            0        11838         5120            0 
+number of iterations: 1 
+  117118    0.0138731    17114            0        11994         5120            0 
+Loop time of 0.0138941 on 4 procs for 1 steps with 17114 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 17114
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  117118            0    17114            0        11994         5120            0 
+  118118    1.4655292    17114            0        11994         5120            0 
+Loop time of 1.46556 on 4 procs for 1000 steps with 17114 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  118118            0    17114            0        11994         5120            0 
+number of iterations: 1 
+  118119  0.011254072    17252            0        12132         5120            0 
+Loop time of 0.0112775 on 4 procs for 1 steps with 17252 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 17252
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  118119            0    17252            0        12132         5120            0 
+  119119    1.3728421    17252            0        12132         5120            0 
+Loop time of 1.37288 on 4 procs for 1000 steps with 17252 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  119119            0    17252            0        12132         5120            0 
+number of iterations: 1 
+  119120  0.011476994    17422            0        12302         5120            0 
+Loop time of 0.0115058 on 4 procs for 1 steps with 17422 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 17422
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  119120            0    17422            0        12302         5120            0 
+  120120     1.318902    17422            0        12302         5120            0 
+Loop time of 1.31893 on 4 procs for 1000 steps with 17422 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  120120            0    17422            0        12302         5120            0 
+number of iterations: 1 
+  120121  0.011262894    17590            0        12470         5120            0 
+Loop time of 0.0112863 on 4 procs for 1 steps with 17590 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 17590
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  120121            0    17590            0        12470         5120            0 
+  121121    1.3473451    17590            0        12470         5120            0 
+Loop time of 1.34737 on 4 procs for 1000 steps with 17590 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  121121            0    17590            0        12470         5120            0 
+number of iterations: 1 
+  121122  0.011461973    17778            0        12658         5120            0 
+Loop time of 0.0114858 on 4 procs for 1 steps with 17778 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 17778
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  121122            0    17778            0        12658         5120            0 
+  122122     1.405092    17778            0        12658         5120            0 
+Loop time of 1.40512 on 4 procs for 1000 steps with 17778 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  122122            0    17778            0        12658         5120            0 
+number of iterations: 1 
+  122123  0.011988878    17992            0        12872         5120            0 
+Loop time of 0.0120175 on 4 procs for 1 steps with 17992 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 17992
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  122123            0    17992            0        12872         5120            0 
+  123123     1.594682    17992            0        12872         5120            0 
+Loop time of 1.59471 on 4 procs for 1000 steps with 17992 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  123123            0    17992            0        12872         5120            0 
+number of iterations: 1 
+  123124  0.013010025    18198            0        13078         5120            0 
+Loop time of 0.0130343 on 4 procs for 1 steps with 18198 atoms
+
+92.3% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 18198
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  123124            0    18198            0        13078         5120            0 
+  124124    1.4836309    18198            0        13078         5120            0 
+Loop time of 1.48366 on 4 procs for 1000 steps with 18198 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  124124            0    18198            0        13078         5120            0 
+number of iterations: 1 
+  124125  0.012181997    18346            0        13226         5120            0 
+Loop time of 0.0122082 on 4 procs for 1 steps with 18346 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 18346
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  124125            0    18346            0        13226         5120            0 
+  125125    1.4936202    18346            0        13226         5120            0 
+Loop time of 1.49365 on 4 procs for 1000 steps with 18346 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  125125            0    18346            0        13226         5120            0 
+number of iterations: 1 
+  125126  0.015148878    18490            0        13370         5120            0 
+Loop time of 0.0151795 on 4 procs for 1 steps with 18490 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 18490
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  125126            0    18490            0        13370         5120            0 
+  126126     1.446677    18490            0        13370         5120            0 
+Loop time of 1.44671 on 4 procs for 1000 steps with 18490 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  126126            0    18490            0        13370         5120            0 
+number of iterations: 1 
+  126127  0.011945963    18690            0        13570         5120            0 
+Loop time of 0.011969 on 4 procs for 1 steps with 18690 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 18690
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  126127            0    18690            0        13570         5120            0 
+  127127     1.636709    18690            0        13570         5120            0 
+Loop time of 1.63674 on 4 procs for 1000 steps with 18690 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  127127            0    18690            0        13570         5120            0 
+number of iterations: 1 
+  127128  0.012158155    18832            0        13712         5120            0 
+Loop time of 0.0121787 on 4 procs for 1 steps with 18832 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 18832
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  127128            0    18832            0        13712         5120            0 
+  128128     1.547461    18832            0        13712         5120            0 
+Loop time of 1.54749 on 4 procs for 1000 steps with 18832 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  128128            0    18832            0        13712         5120            0 
+number of iterations: 1 
+  128129  0.013435125    19034            0        13914         5120            0 
+Loop time of 0.0134628 on 4 procs for 1 steps with 19034 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 19034
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  128129            0    19034            0        13914         5120            0 
+  129129      1.63691    19034            0        13914         5120            0 
+Loop time of 1.63694 on 4 procs for 1000 steps with 19034 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  129129            0    19034            0        13914         5120            0 
+number of iterations: 1 
+  129130  0.013315916    19220            0        14100         5120            0 
+Loop time of 0.0133395 on 4 procs for 1 steps with 19220 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 19220
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  129130            0    19220            0        14100         5120            0 
+  130130    2.0084321    19220            0        14100         5120            0 
+Loop time of 2.00846 on 4 procs for 1000 steps with 19220 atoms
+
+99.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  130130            0    19220            0        14100         5120            0 
+number of iterations: 1 
+  130131   0.01382494    19418            0        14298         5120            0 
+Loop time of 0.0138526 on 4 procs for 1 steps with 19418 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 19418
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  130131            0    19418            0        14298         5120            0 
+  131131     1.602299    19418            0        14298         5120            0 
+Loop time of 1.60233 on 4 procs for 1000 steps with 19418 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  131131            0    19418            0        14298         5120            0 
+number of iterations: 1 
+  131132   0.01266098    19610            0        14490         5120            0 
+Loop time of 0.0126836 on 4 procs for 1 steps with 19610 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 19610
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  131132            0    19610            0        14490         5120            0 
+  132132    1.8800278    19610            0        14490         5120            0 
+Loop time of 1.88006 on 4 procs for 1000 steps with 19610 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  132132            0    19610            0        14490         5120            0 
+number of iterations: 1 
+  132133   0.01245594    19724            0        14604         5120            0 
+Loop time of 0.0124807 on 4 procs for 1 steps with 19724 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 19724
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  132133            0    19724            0        14604         5120            0 
+  133133    1.6187429    19724            0        14604         5120            0 
+Loop time of 1.61877 on 4 procs for 1000 steps with 19724 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  133133            0    19724            0        14604         5120            0 
+number of iterations: 1 
+  133134  0.012923002    19898            0        14778         5120            0 
+Loop time of 0.0129502 on 4 procs for 1 steps with 19898 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 19898
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  133134            0    19898            0        14778         5120            0 
+  134134    2.0866249    19898            0        14778         5120            0 
+Loop time of 2.08666 on 4 procs for 1000 steps with 19898 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  134134            0    19898            0        14778         5120            0 
+number of iterations: 1 
+  134135  0.012737036    20024            0        14904         5120            0 
+Loop time of 0.0127639 on 4 procs for 1 steps with 20024 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 20024
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  134135            0    20024            0        14904         5120            0 
+  135135    1.6295362    20024            0        14904         5120            0 
+Loop time of 1.62957 on 4 procs for 1000 steps with 20024 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  135135            0    20024            0        14904         5120            0 
+number of iterations: 1 
+  135136  0.012740135    20196            0        15076         5120            0 
+Loop time of 0.0127656 on 4 procs for 1 steps with 20196 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 20196
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  135136            0    20196            0        15076         5120            0 
+  136136    1.6992581    20196            0        15076         5120            0 
+Loop time of 1.69929 on 4 procs for 1000 steps with 20196 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  136136            0    20196            0        15076         5120            0 
+number of iterations: 1 
+  136137  0.013689995    20310            0        15190         5120            0 
+Loop time of 0.0137146 on 4 procs for 1 steps with 20310 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 20310
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  136137            0    20310            0        15190         5120            0 
+  137137     1.795414    20310            0        15190         5120            0 
+Loop time of 1.79544 on 4 procs for 1000 steps with 20310 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  137137            0    20310            0        15190         5120            0 
+number of iterations: 1 
+  137138  0.013369083    20480            0        15360         5120            0 
+Loop time of 0.0134016 on 4 procs for 1 steps with 20480 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 20480
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  137138            0    20480            0        15360         5120            0 
+  138138    1.7893271    20480            0        15360         5120            0 
+Loop time of 1.78936 on 4 procs for 1000 steps with 20480 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  138138            0    20480            0        15360         5120            0 
+number of iterations: 1 
+  138139  0.017050028    20646            0        15526         5120            0 
+Loop time of 0.0170753 on 4 procs for 1 steps with 20646 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 20646
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  138139            0    20646            0        15526         5120            0 
+  139139    1.9511862    20646            0        15526         5120            0 
+Loop time of 1.95122 on 4 procs for 1000 steps with 20646 atoms
+
+99.9% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  139139            0    20646            0        15526         5120            0 
+number of iterations: 1 
+  139140  0.013811111    20742            0        15622         5120            0 
+Loop time of 0.0138335 on 4 procs for 1 steps with 20742 atoms
+
+100.0% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 20742
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  139140            0    20742            0        15622         5120            0 
+  140140      2.16974    20742            0        15622         5120            0 
+Loop time of 2.16976 on 4 procs for 1000 steps with 20742 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  140140            0    20742            0        15622         5120            0 
+number of iterations: 1 
+  140141  0.013208866    20920            0        15800         5120            0 
+Loop time of 0.0132341 on 4 procs for 1 steps with 20920 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 20920
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  140141            0    20920            0        15800         5120            0 
+  141141     2.022994    20920            0        15800         5120            0 
+Loop time of 2.02302 on 4 procs for 1000 steps with 20920 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  141141            0    20920            0        15800         5120            0 
+number of iterations: 1 
+  141142  0.013648033    21034            0        15914         5120            0 
+Loop time of 0.0136724 on 4 procs for 1 steps with 21034 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 21034
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  141142            0    21034            0        15914         5120            0 
+  142142    1.9413459    21034            0        15914         5120            0 
+Loop time of 1.94137 on 4 procs for 1000 steps with 21034 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  142142            0    21034            0        15914         5120            0 
+number of iterations: 1 
+  142143  0.014668941    21198            0        16078         5120            0 
+Loop time of 0.0146915 on 4 procs for 1 steps with 21198 atoms
+
+99.5% CPU use with 4 MPI tasks x no OpenMP threads
+fix_modify k1 demflag 1
+fix_modify d2 demflag 1
+fix_modify d1 demflag 1
+delete_atoms region reg3
+Deleted 0 atoms, new total = 21198
+timestep 0.1
+run 1000 pre no post no
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  142143            0    21198            0        16078         5120            0 
+  143143     2.034826    21198            0        16078         5120            0 
+Loop time of 2.03486 on 4 procs for 1000 steps with 21198 atoms
+
+99.7% CPU use with 4 MPI tasks x no OpenMP threads
+timestep 720
+fix_modify k1 demflag 0
+fix_modify d2 demflag 0
+fix_modify d1 demflag 0
+Step CPU Atoms c_myNtypes[1] c_myNtypes[2] c_myNtypes[3] c_myNtypes[4] 
+  143143            0    21198            0        16078         5120            0 
+number of iterations: 1 
+  143144  0.013449907    21302            0        16182         5120            0 
+Loop time of 0.0134768 on 4 procs for 1 steps with 21302 atoms
+
+99.8% CPU use with 4 MPI tasks x no OpenMP threads
