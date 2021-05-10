@@ -30,17 +30,17 @@ neigh_modify    check yes               # rebuild neighbour list if any atom
 					#   distance
 
 # select grid style
-grid_style      nufeb/monod 4 sub o2 no2 no3 4e-6 pp pp nd
+grid_style      nufeb/monod 4 sub o2 no2 no3 4e-6
 
 # test grid comm
 #run_style       test/comm_grid
 #run             0
 
 # set substrates initial concentration
-grid_modify     set sub    1e-4   
-grid_modify     set o2     1e-4   
-grid_modify     set no2    1e-4    
-grid_modify     set no3    1e-4    
+grid_modify     set sub    1e-4
+grid_modify     set o2     1e-4
+grid_modify     set no2    1e-4
+grid_modify     set no3    1e-4
 
 # define pair style
 pair_style  gran/hooke/history 1e-4 NULL 1e-5 NULL 0.0 1
