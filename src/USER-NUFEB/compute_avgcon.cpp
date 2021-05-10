@@ -21,7 +21,6 @@
 #include "update.h"
 #include "memory.h"
 
-#include "fix.h"
 #include "modify.h"
 #include "grid.h"
 #include "grid_masks.h"

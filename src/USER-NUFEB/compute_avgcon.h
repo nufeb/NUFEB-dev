@@ -28,10 +28,6 @@ class ComputeNufebAvgcon : public Compute {
   ~ComputeNufebAvgcon();
   void init() {}
   virtual void compute_vector();
-
-  int nfix;                  // # of Fix objects used by dump
-  char **id_fix;             // their IDs
-  class Fix **fix;           // list of ptrs to the Fix objects
 };
 
 }
