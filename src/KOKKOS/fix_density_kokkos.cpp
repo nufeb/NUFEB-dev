@@ -52,6 +52,10 @@ void FixDensityKokkos<DeviceType>::init()
 
 /* ---------------------------------------------------------------------- */
 
+struct AtomicD {
+  enum {value = Kokkos::Atomic|Kokkos::Unmanaged};
+};
+
 template<class DeviceType>
 void FixDensityKokkos<DeviceType>::compute()
 {
@@ -83,6 +87,10 @@ void FixDensityKokkos<DeviceType>::compute()
 
   Kokkos::parallel_for(atom->nlocal + atom->nghost,
 		       LAMMPS_LAMBDA(int i) {
+			 Kokkos::View<double**,
+				      typename DAT::t_float_2d::array_layout,DeviceType,
+				      Kokkos::MemoryTraits<AtomicD::value> > a_dens = d_dens;
+
 			 // including ghost atoms because there can be atoms that moved inside the
 			 //   sub-domain and were not yet exchanged
 			 // forward communication garantees that we have the latest ghost positions
@@ -103,10 +111,10 @@ void FixDensityKokkos<DeviceType>::compute()
 			     c[2] * grid_subbox[0] * grid_subbox[1];
 
 			   double d = d_biomass(i) / vol;
-			   d_dens(0,cell) += d;
+			   a_dens(0,cell) += d;
 			   for (int igroup = 0; igroup < ngroup; igroup++)
 			     if (d_mask(i) & d_bitmask(igroup))
-			       d_dens(igroup,cell) += d;
+			       a_dens(igroup,cell) += d;
 			 }
 		       });
   copymode = 0;
