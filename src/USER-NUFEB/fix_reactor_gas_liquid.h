@@ -13,38 +13,38 @@
 
 #ifdef FIX_CLASS
 
-FixStyle(nufeb/biomass_balance,FixBiomassBalance)
+FixStyle(nufeb/reactor/gas_liquid,FixGasLiquid)
 
 #else
 
-#ifndef LMP_FIX_BIOMASS_BALANCE_H
-#define LMP_FIX_BIOMASS_BALANCE_H
+#ifndef LMP_FIX_GAS_LIQUID_H
+#define LMP_FIX_GAS_LIQUID_H
 
-#include "fix.h"
+#include "fix_reactor.h"
 
 namespace LAMMPS_NS {
 
-class FixBiomassBalance : public Fix {
+class FixGasLiquid : public FixReactor {
  public:
-  int compute_flag;
 
-  FixBiomassBalance(class LAMMPS *, int, char **);
-  virtual ~FixBiomassBalance();
-  int setmask();
-  int modify_param(int, char **);
-  virtual void init();
-  virtual void post_integrate();
+  FixGasLiquid(class LAMMPS *, int, char **);
+  virtual ~FixGasLiquid() {}
+  virtual double compute_scalar();
   virtual void compute();
 
  protected:
-  int nsubs;
-  int *isub;
-  double *inlet;
+  int iliquid;
+  int igas;
 
-  double q;
-  double rvol;
-  double af;
-  double xy;
+  double kga;
+  double h;
+  double temp;
+  double reactor_vhead;
+  double reactor_pres;
+  double mw;
+  double rg;
+
+  double rtotal;
 };
 
 }

@@ -1301,8 +1301,8 @@
 /compute_volume.h
 /compute_avgcon.cpp
 /compute_avgcon.h
-/fix_biomass_balance.cpp
-/fix_biomass_balance.h
+/dump_hdf5.cpp
+/dump_hdf5.h
 /fix_death.cpp
 /fix_death.h
 /fix_density.cpp
@@ -1349,9 +1349,14 @@
 /fix_nve_bacillus.h
 /fix_nve_bacillus_limit.cpp
 /fix_nve_bacillus_limit.h
+/fix_reactor_gas_liquid.cpp
+/fix_reactor_gas_liquid.h
+/fix_reactor_solute_balance.cpp
+/fix_reactor_sulute_balance.h
+/fix_reactor_gas_balance.cpp
+/fix_reactor_gas_balance.h
 /pair_bacillus.cpp
 /pair_bacillus.h
-
 
 !accelerator_kokkos.h 
 !accelerator_omp.h 
