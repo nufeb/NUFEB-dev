@@ -1,0 +1,121 @@
+# NUFEB simulation with HETs and AOBs
+
+units si                                   # using si units
+atom_style      coccus                      # using nufeb atom style
+atom_modify     map array sort 1000 1e-6   # map array: find atoms using indices
+		                           # sort 1000 5.0e-6: sort every 1000
+					   #   steps with 5.0e-6 binsize
+boundary        pp pp ff                   # periodic boundaries in x and y
+                                           #   fixed boundary in z
+newton          off                        # forces between local and ghost
+                                           #   atoms are computed in each
+					   #   processor without communication
+#processors      4 4 1                      # processor grid
+
+comm_modify     vel yes                    # communicate velocities for ghost
+                                           # atoms
+comm_modify     cutoff 2e-6                # guarantee that enough atoms are
+                                           # communicated to correctly compute
+
+read_data      atom_2_het.in					  
+
+group           het_1   type 1            # defining het_1 group
+group           het_2   type 2            # defining het_2 group
+group           eps     type 3
+group           dead  empty
+
+neighbor        7e-7 bin                # setting neighbour skin distance and
+                                        #   style
+neigh_modify    check yes               # rebuild neighbour list if any atom
+                                        #   had moved more than half the skin
+					#   distance
+
+# select grid style
+grid_style      nufeb/monod 4 sub o2 no2 no3 4e-6
+
+# test grid comm
+#run_style       test/comm_grid
+#run             0
+
+# set substrates initial concentration
+grid_modify     set sub    1e-4   
+grid_modify     set o2     1e-4   
+grid_modify     set no2    1e-4    
+grid_modify     set no3    1e-4    
+
+# define pair style
+pair_style  gran/hooke/history 1e-4 NULL 1e-5 NULL 0.0 1
+pair_coeff  * *
+
+# NVE integration with maximum distance limit
+fix nve all nve/limit 1e-8
+
+# monod reaction fixes
+#   should consider using read_data's fix keyword
+fix monod_het_1 het_1 nufeb/monod/het sub 3.5e-5 o2 0 no2 0 no3 0 growth 0.00028 yield 0.61 decay 0.0 epsyield 0.18 anoxic 0.0 epsdens 30
+fix monod_het_2 het_2 nufeb/monod/het sub 3.5e-5 o2 0 no2 0 no3 0 growth 0.00028 yield 0.61 decay 0.0 epsyield 0.18 anoxic 0.0 epsdens 30
+fix monod_eps eps nufeb/monod/eps sub decay 0
+
+# diffusion reaction fixes
+fix diff_sub all nufeb/diffusion_reaction sub 1.6e-9 pp pp nd 1e-4
+
+# biological model fixes
+fix div all nufeb/divide/coccus 1.36e-6 30 1234
+fix eps_ext_1 het_1 nufeb/eps_extract 2 eps 1.3 30 5678
+fix eps_ext_2 het_2 nufeb/eps_extract 2 eps 1.3 30 5678
+fix death_1 het_1 nufeb/death dead 5e-7
+fix death_2 het_2 nufeb/death dead 5e-7
+
+# mechanical model fixes
+fix wall all wall/gran hooke/history 1e-3 NULL 1e-4 NULL 0 0 zplane 0.0 8e-5
+#fix_modify wall virial yes
+fix eps_adh all nufeb/adhesion/eps eps 1e6
+#fix_modify eps_adh virial yes
+
+#fix f_adh all nufeb/adhesion 0 1e-6
+#fix_modify f_adh ah * * 1e-17
+
+fix vis all viscous 1e-5
+
+# pressure computation
+compute ke all ke
+variable one equal 1.0
+compute press all pressure NULL pair vol v_one
+variable press equal "(c_ke + c_press) / (3.0 * c_vol)" 
+variable mass equal "mass(all)"
+
+# Relative volume of the two heterotrophs
+# Compute scalar volumes representing total volume and per-heterotroph volume
+compute vol all nufeb/volume
+compute h1v het_1 nufeb/volume
+compute h2v het_2 nufeb/volume
+
+# Use the computes to populate variables for output
+variable vol equal "c_vol"
+variable h1v equal "c_h1v"
+variable h2v equal "c_h2v"
+# Relative volume of hetertroph 1 vs total heterotrophs
+variable h1rv equal "c_h1v / (c_h1v + c_h2v)" 
+# Timestep
+variable step equal "step"
+
+# file output
+#dump du1 all vtk 1 dump*.vtu id type diameter 
+#dump du2 all grid/vtk 10 dump_%_*.vti con rea den gro 
+#dump du3 all nufeb/hdf5 10 dump.h5 id type x y z vx vy vz fx fy fz radius conc reac 
+
+# Record the cell volume data to a csv file
+fix volcsv all print 1 "${step},${vol},${h1v},${h2v},${h1rv}" & 
+    screen no &
+    file "cell_volumes.csv" & 
+    title "step,total volume,heterotroph 1 volume,heterotroph 2 volume,heterotroph 1 volume fraction"
+
+
+# thermo output
+thermo_style custom step atoms c_vol v_press v_mass c_h1v  c_h2v v_h1rv
+thermo 1
+thermo_modify lost ignore
+# issue run command
+run_style nufeb diffdt 1e-4 difftol 1e-6 pairdt 1e-2 pairtol 1 pairmax 1000 diffmax 1000
+timestep 1000
+run 800
