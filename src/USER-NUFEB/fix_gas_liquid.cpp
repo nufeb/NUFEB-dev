@@ -11,12 +11,13 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
+#include "fix_gas_liquid.h"
+
 #include <cstdio>
 #include <cstring>
 #include <cmath>
 #include "error.h"
 
-#include "fix_reactor_gas_liquid.h"
 #include "grid.h"
 #include "grid_masks.h"
 #include "force.h"
@@ -26,11 +27,14 @@ using namespace FixConst;
 
 /* ---------------------------------------------------------------------- */
 
-FixReactorGasLiquid::FixReactorGasLiquid(LAMMPS *lmp, int narg, char **arg) :
-  FixReactor(lmp, narg, arg)
+FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
+  Fix(lmp, narg, arg)
 {
   if (narg < 5)
     error->all(FLERR,"Illegal fix nufeb/gas_liquid command");
+
+  if (!grid->reactor_flag)
+    error->all(FLERR,"Fix reactor requires nufeb/reactor grid style");
 
   iliquid = -1;
   igas = -1;
@@ -92,11 +96,51 @@ FixReactorGasLiquid::FixReactorGasLiquid(LAMMPS *lmp, int narg, char **arg) :
       error->all(FLERR, "Illegal fix nufeb/gas_liquid command");
     }
   }
+
+  compute_flag = 1;
+  scalar_flag = 1;
 }
 
 /* ---------------------------------------------------------------------- */
 
-double FixReactorGasLiquid::compute_scalar()
+int FixGasLiquid::modify_param(int narg, char **arg)
+{
+  int iarg = 0;
+  while (iarg < narg) {
+    if (strcmp(arg[iarg], "compute") == 0) {
+      if (strcmp(arg[iarg+1], "yes") == 0) {
+	compute_flag = 1;
+      } else if (strcmp(arg[iarg+1], "no") == 0) {
+	compute_flag = 0;
+      } else {
+	error->all(FLERR, "Illegal fix_modify command");
+      }
+      iarg += 2;
+    }
+  }
+  return iarg;
+}
+
+/* ---------------------------------------------------------------------- */
+
+int FixGasLiquid::setmask()
+{
+  int mask = 0;
+  mask |= POST_INTEGRATE;
+  return mask;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void FixGasLiquid::post_integrate()
+{
+  if (compute_flag)
+    compute();
+}
+
+/* ---------------------------------------------------------------------- */
+
+double FixGasLiquid::compute_scalar()
 {
   double result = 0.0;
 
@@ -114,7 +158,7 @@ double FixReactorGasLiquid::compute_scalar()
 
 /* ---------------------------------------------------------------------- */
 
-void FixReactorGasLiquid::compute()
+void FixGasLiquid::compute()
 {
   double **conc = grid->conc;
   double **reac = grid->reac;

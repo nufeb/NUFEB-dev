@@ -28,7 +28,7 @@ class FixReactor : public Fix {
   int modify_param(int, char **);
   virtual int setmask();
   virtual void post_integrate();
-  virtual void compute();
+  virtual void compute() = 0;
 };
 
 }

@@ -30,6 +30,7 @@ FixReactor::FixReactor(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR,"Fix reactor requires nufeb/reactor grid style");
 
   compute_flag = 1;
+  scalar_flag = 1;
 }
 
 /* ---------------------------------------------------------------------- */

@@ -25,7 +25,7 @@
 #include "domain.h"
 #include "memory.h"
 
-#include "fix_reactor_gas_liquid.h"
+#include "fix_gas_liquid.h"
 #include "modify.h"
 
 
@@ -75,12 +75,12 @@ FixReactorGasBalance::~FixReactorGasBalance()
 void FixReactorGasBalance::init()
 {
   // allocate space for storing fixes
-  fix_gas_liquid = new FixReactorGasLiquid*[modify->nfix];
+  fix_gas_liquid = new FixGasLiquid*[modify->nfix];
 
   // find fixes
   for (int i = 0; i < modify->nfix; i++) {
     if (strstr(modify->fix[i]->style, "nufeb/gas_liquid")) {
-      fix_gas_liquid[nfix_gas_liquid++] = (FixReactorGasLiquid *)modify->fix[i];
+      fix_gas_liquid[nfix_gas_liquid++] = (FixGasLiquid *)modify->fix[i];
     }
   }
 }
