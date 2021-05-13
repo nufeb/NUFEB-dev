@@ -40,7 +40,7 @@ class FixReactorGasBalance : public FixReactor {
   double reactor_vhead;
   int nfix_gas_liquid;
 
-  class FixGasLiquid *fix_gas_liquid;
+  class FixReactorGasLiquid **fix_gas_liquid;
 };
 
 }

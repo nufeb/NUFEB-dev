@@ -13,22 +13,22 @@
 
 #ifdef FIX_CLASS
 
-FixStyle(nufeb/reactor/gas_liquid,FixGasLiquid)
+FixStyle(nufeb/reactor/gas_liquid,FixReactorGasLiquid)
 
 #else
 
-#ifndef LMP_FIX_GAS_LIQUID_H
-#define LMP_FIX_GAS_LIQUID_H
+#ifndef LMP_FIX_REACTOR_GAS_LIQUID_H
+#define LMP_FIX_REACTOR_GAS_LIQUID_H
 
 #include "fix_reactor.h"
 
 namespace LAMMPS_NS {
 
-class FixGasLiquid : public FixReactor {
+class FixReactorGasLiquid : public FixReactor {
  public:
 
-  FixGasLiquid(class LAMMPS *, int, char **);
-  virtual ~FixGasLiquid() {}
+  FixReactorGasLiquid(class LAMMPS *, int, char **);
+  virtual ~FixReactorGasLiquid() {}
   virtual double compute_scalar();
   virtual void compute();
 

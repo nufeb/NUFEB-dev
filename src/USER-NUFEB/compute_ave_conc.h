@@ -11,21 +11,21 @@
 
 #ifdef COMPUTE_CLASS
 
-ComputeStyle(avg_con,ComputeNufebAvgcon)
+ComputeStyle(nufeb/ave_conc,ComputeAveConc)
 
 #else
 
-#ifndef LMP_COMPUTE_AVGCON_H
-#define LMP_COMPUTE_AVGCON_H
+#ifndef LMP_COMPUTE_AVE_CONC_H
+#define LMP_COMPUTE_AVE_CONC_H
 
 #include "compute.h"
 
 namespace LAMMPS_NS {
 
-class ComputeNufebAvgcon : public Compute {
+class ComputeAveConc : public Compute {
  public:
-  ComputeNufebAvgcon(class LAMMPS *, int, char **);
-  ~ComputeNufebAvgcon();
+  ComputeAveConc(class LAMMPS *, int, char **);
+  ~ComputeAveConc();
   void init() {}
   virtual void compute_vector();
 };

@@ -75,12 +75,12 @@ FixReactorGasBalance::~FixReactorGasBalance()
 void FixReactorGasBalance::init()
 {
   // allocate space for storing fixes
-  fix_gas_liquid = new FixGasLiquid*[modify->nfix];
+  fix_gas_liquid = new FixReactorGasLiquid*[modify->nfix];
 
   // find fixes
   for (int i = 0; i < modify->nfix; i++) {
     if (strstr(modify->fix[i]->style, "nufeb/gas_liquid")) {
-      fix_gas_liquid[nfix_gas_liquid++] = (FixGasLiquid *)modify->fix[i];
+      fix_gas_liquid[nfix_gas_liquid++] = (FixReactorGasLiquid *)modify->fix[i];
     }
   }
 }
@@ -103,7 +103,7 @@ void FixReactorGasBalance::compute()
   double sum_reac;
 
   for (int i = 0; i < nfix_gas_liquid; i++)
-    q += fix_gas_liquid[i].compute_scalar();
+    q += fix_gas_liquid[i]->compute_scalar();
 
   sum_reac = 0;
   for (int i = 0; i < grid->ncells; i++) {

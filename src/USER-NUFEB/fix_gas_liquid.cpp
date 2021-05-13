@@ -26,7 +26,7 @@ using namespace FixConst;
 
 /* ---------------------------------------------------------------------- */
 
-FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
+FixReactorGasLiquid::FixReactorGasLiquid(LAMMPS *lmp, int narg, char **arg) :
   FixReactor(lmp, narg, arg)
 {
   if (narg < 5)
@@ -96,7 +96,7 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
 
 /* ---------------------------------------------------------------------- */
 
-double FixGasLiquid::compute_scalar()
+double FixReactorGasLiquid::compute_scalar()
 {
   double result = 0.0;
 
@@ -114,7 +114,7 @@ double FixGasLiquid::compute_scalar()
 
 /* ---------------------------------------------------------------------- */
 
-void FixGasLiquid::compute()
+void FixReactorGasLiquid::compute()
 {
   double **conc = grid->conc;
   double **reac = grid->reac;

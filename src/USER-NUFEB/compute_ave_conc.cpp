@@ -9,7 +9,7 @@
    the GNU General Public License.
 ------------------------------------------------------------------------- */
 
-#include "compute_avgcon.h"
+#include "compute_ave_conc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +29,7 @@ using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-ComputeNufebAvgcon::ComputeNufebAvgcon(LAMMPS *lmp, int narg, char **arg) :
+ComputeAveConc::ComputeAveConc(LAMMPS *lmp, int narg, char **arg) :
   Compute(lmp, narg, arg)
 {
   if (narg != 3) error->all(FLERR,"Illegal compute avgcon command");
@@ -43,14 +43,14 @@ ComputeNufebAvgcon::ComputeNufebAvgcon(LAMMPS *lmp, int narg, char **arg) :
 
 /* ---------------------------------------------------------------------- */
 
-ComputeNufebAvgcon::~ComputeNufebAvgcon()
+ComputeAveConc::~ComputeAveConc()
 {
   memory->destroy(vector);
 }
 
 /* ---------------------------------------------------------------------- */
 
-void ComputeNufebAvgcon::compute_vector()
+void ComputeAveConc::compute_vector()
 {
   invoked_vector = update->ntimestep;
 
