@@ -43,10 +43,8 @@ FixPropertyCycletime::FixPropertyCycletime(LAMMPS *lmp, int narg, char **arg) :
 void FixPropertyCycletime::init()
 {
   for (int i = 0; i < atom->nlocal; i++) {
-    if (atom->mask[i] & groupbit) {
-      aprop[i][0] = 0.0;
-      aprop[i][1] = 0.0;
-    }
+    aprop[i][0] = 0.0;
+    aprop[i][1] = 0.0;
   }
 }
 

@@ -40,8 +40,7 @@ FixPropertyGeneration::FixPropertyGeneration(LAMMPS *lmp, int narg, char **arg) 
 void FixPropertyGeneration::init()
 {
   for (int i = 0; i < atom->nlocal; i++) {
-    if (atom->mask[i] & groupbit)
-      vprop[i] = 0.0;
+    vprop[i] = 0.0;
   }
 }
 
