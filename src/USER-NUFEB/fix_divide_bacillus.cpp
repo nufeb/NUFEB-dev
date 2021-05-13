@@ -149,6 +149,9 @@ void FixDivideBacillus::compute()
 
         modify->create_attribute(n);
 
+        for (int m = 0; m < modify->nfix; m++)
+          modify->fix[m]->update_arrays(i, n);
+
         delete[] coord;
       }
     }
