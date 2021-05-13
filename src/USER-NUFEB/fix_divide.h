@@ -25,9 +25,9 @@ class FixDivide : public Fix {
   FixDivide(class LAMMPS *, int, char **);
   virtual ~FixDivide() {};
   int modify_param(int, char **);
-  virtual int setmask();
-  virtual void post_integrate();
-  virtual void post_neighbor();
+  int setmask();
+  void post_integrate();
+  void post_neighbor();
   virtual void compute() = 0;
 };
 

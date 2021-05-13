@@ -56,6 +56,9 @@
 #include "fix_eps_extract.h"
 #include "fix_divide.h"
 #include "fix_death.h"
+#include "fix_reactor.h"
+#include "fix_gas_liquid.h"
+#include "fix_property.h"
 #include "compute_volume.h"
 
 using namespace LAMMPS_NS;
@@ -82,6 +85,9 @@ NufebRun::NufebRun(LAMMPS *lmp, int narg, char **arg) :
   nfix_eps_extract = 0;
   nfix_divide = 0;
   nfix_death = 0;
+  nfix_gas_liquid = 0;
+  nfix_reactor = 0;
+  nfix_property = 0;
   
   fix_density = NULL;
   fix_monod = NULL;
@@ -92,6 +98,7 @@ NufebRun::NufebRun(LAMMPS *lmp, int narg, char **arg) :
   fix_eps_extract = NULL;
   fix_divide = NULL;
   fix_death = NULL;
+  fix_property = NULL;
 
   profile = NULL;
   
@@ -145,6 +152,9 @@ NufebRun::~NufebRun()
   delete [] fix_eps_extract;
   delete [] fix_divide;
   delete [] fix_death;
+  delete [] fix_gas_liquid;
+  delete [] fix_reactor;
+  delete [] fix_property;
 }
 
 /* ----------------------------------------------------------------------
@@ -173,6 +183,9 @@ void NufebRun::init()
   fix_eps_extract = new FixEPSExtract*[modify->nfix];
   fix_divide = new FixDivide*[modify->nfix];
   fix_death = new FixDeath*[modify->nfix];
+  fix_reactor = new FixReactor*[modify->nfix];
+  fix_gas_liquid = new FixGasLiquid*[modify->nfix];
+  fix_property = new FixProperty*[modify->nfix];
   
   // find fixes
   for (int i = 0; i < modify->nfix; i++) {
@@ -186,6 +199,12 @@ void NufebRun::init()
       fix_divide[nfix_divide++] = (FixDivide *)modify->fix[i];
     } else if (strstr(modify->fix[i]->style, "nufeb/death")) {
       fix_death[nfix_death++] = (FixDeath *)modify->fix[i];
+    } else if (strstr(modify->fix[i]->style, "nufeb/reactor")) {
+      fix_reactor[nfix_reactor++] = (FixReactor *)modify->fix[i];
+    } else if (strstr(modify->fix[i]->style, "nufeb/gas_liquid")) {
+      fix_gas_liquid[nfix_gas_liquid++] = (FixGasLiquid *)modify->fix[i];
+    } else if (strstr(modify->fix[i]->style, "nufeb/property")) {
+      fix_property[nfix_property++] = (FixProperty *)modify->fix[i];
     }
   }
   
@@ -348,6 +367,12 @@ void NufebRun::setup(int flag)
     fix_divide[i]->compute_flag = 0;
   for (int i = 0; i < nfix_death; i++)
     fix_death[i]->compute_flag = 0;
+  for (int i = 0; i < nfix_reactor; i++)
+    fix_reactor[i]->compute_flag = 0;
+  for (int i = 0; i < nfix_gas_liquid; i++)
+    fix_gas_liquid[i]->compute_flag = 0;
+  for (int i = 0; i < nfix_property; i++)
+    fix_property[i]->compute_flag = 0;
 
   // compute density
   fix_density->compute();
@@ -596,13 +621,14 @@ void NufebRun::run(int n)
     timer->stamp(Timer::MODIFY);
 
     // run diffusion until it reaches steady state
-
     t = get_time();
     ndiff = diffusion();
     if (profile)
       fprintf(profile, "%d %e\n", ndiff, get_time()-t);
     if (comm->me == 0) fprintf(screen, "diffusion: %d steps\n", ndiff);
     
+    reactor();
+
     // all output
 
     if (ntimestep == output->next) {
@@ -715,6 +741,10 @@ void NufebRun::growth()
   for (int i = 0; i < nfix_death; i++) {
     fix_death[i]->compute();
   }
+
+  for (int i = 0; i < nfix_property; i++) {
+    fix_property[i]->compute();
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -754,6 +784,9 @@ int NufebRun::diffusion()
     for (int i = 0; i < nfix_monod; i++) {
       fix_monod[i]->compute();
     }
+    for (int i = 0; i < nfix_gas_liquid; i++) {
+      fix_gas_liquid[i]->compute();
+    }
     for (int i = 0; i < nfix_diffusion; i++) {
       if (!converge[i]) {
 	fix_diffusion[i]->compute_final();
@@ -775,6 +808,22 @@ int NufebRun::diffusion()
   }
 
   return niter;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void NufebRun::reactor()
+{
+  // set biological dt
+
+  update->dt = biodt;
+  reset_dt();
+
+  // update reactor attributes
+
+  for (int i = 0; i < nfix_reactor; i++) {
+    fix_reactor[i]->compute();
+  }
 }
 
 /* ---------------------------------------------------------------------- */

@@ -58,6 +58,9 @@ class NufebRun : public Integrate {
   int nfix_eps_extract;
   int nfix_divide;
   int nfix_death;
+  int nfix_gas_liquid;
+  int nfix_reactor;
+  int nfix_property;
   
   class FixDensity *fix_density;
   class FixMonod **fix_monod;
@@ -68,10 +71,14 @@ class NufebRun : public Integrate {
   class FixEPSExtract **fix_eps_extract;
   class FixDivide **fix_divide;
   class FixDeath **fix_death;
+  class FixGasLiquid **fix_gas_liquid;
+  class FixReactor **fix_reactor;
+  class FixProperty **fix_property;
 
   FILE *profile;
   
   virtual void growth();
+  virtual void reactor();
   virtual int diffusion();
   double get_time();
 };
