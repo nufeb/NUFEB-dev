@@ -99,7 +99,7 @@ void FixDivideBacillus::compute()
 
 	avec->get_pole_coords(i, xp1, xp2);
 
-        // update bacillus i
+        // update daughter cell i
 	double dl = (0.5*ilen + atom->radius[i]) / (0.5*old_len);
 	atom->x[i][0] += (xp1[0] - oldx) * dl;
 	atom->x[i][1] += (xp1[1] - oldy) * dl;
@@ -116,7 +116,7 @@ void FixDivideBacillus::compute()
         bonus->pole2[2] *= ilen / old_len;
         bonus->length = ilen;
 
-        // create bacillus j
+        // create daughter cell j
         double *coord = new double[3];
 
 	coord[0] = oldx + (xp2[0] - oldx) * dl;
@@ -124,33 +124,33 @@ void FixDivideBacillus::compute()
 	coord[2] = oldz + (xp2[2] - oldz) * dl;
 
         avec->create_atom(atom->type[i], coord);
-        int n = atom->nlocal - 1;
-        atom->bacillus[n] = 0;
+        int j = atom->nlocal - 1;
+        atom->bacillus[j] = 0;
 
-        avec->set_bonus(n, bonus->pole1, bonus->diameter, bonus->quat, bonus->inertia);
+        avec->set_bonus(j, bonus->pole1, bonus->diameter, bonus->quat, bonus->inertia);
 
-        atom->tag[n] = 0;
-        atom->mask[n] = atom->mask[i];
-        atom->v[n][0] = atom->v[i][0];
-        atom->v[n][1] = atom->v[i][1];
-        atom->v[n][2] = atom->v[i][2];
-	atom->f[n][0] = atom->f[i][0];
-	atom->f[n][1] = atom->f[i][1];
-	atom->f[n][2] = atom->f[i][2];
-	atom->torque[n][0] = atom->torque[i][0];
-	atom->torque[n][1] = atom->torque[i][1];
-	atom->torque[n][2] = atom->torque[i][2];
-	atom->angmom[n][0] = atom->angmom[i][0];
-	atom->angmom[n][1] = atom->angmom[i][1];
-	atom->angmom[n][2] = atom->angmom[i][2];
-        atom->rmass[n] = imass;
-        atom->biomass[n] = ibiomass;
-        atom->radius[n] = atom->radius[i];
+        atom->tag[j] = 0;
+        atom->mask[j] = atom->mask[i];
+        atom->v[j][0] = atom->v[i][0];
+        atom->v[j][1] = atom->v[i][1];
+        atom->v[j][2] = atom->v[i][2];
+	atom->f[j][0] = atom->f[i][0];
+	atom->f[j][1] = atom->f[i][1];
+	atom->f[j][2] = atom->f[i][2];
+	atom->torque[j][0] = atom->torque[i][0];
+	atom->torque[j][1] = atom->torque[i][1];
+	atom->torque[j][2] = atom->torque[i][2];
+	atom->angmom[j][0] = atom->angmom[i][0];
+	atom->angmom[j][1] = atom->angmom[i][1];
+	atom->angmom[j][2] = atom->angmom[i][2];
+        atom->rmass[j] = imass;
+        atom->biomass[j] = ibiomass;
+        atom->radius[j] = atom->radius[i];
 
-        modify->create_attribute(n);
+        modify->create_attribute(j);
 
         for (int m = 0; m < modify->nfix; m++)
-          modify->fix[m]->update_arrays(i, n);
+          modify->fix[m]->update_arrays(i, j);
 
         delete[] coord;
       }

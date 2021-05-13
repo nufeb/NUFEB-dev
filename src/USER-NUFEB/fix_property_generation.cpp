@@ -49,9 +49,9 @@ void FixPropertyGeneration::init()
    initialize one atom's array values, called when atom is created
 ------------------------------------------------------------------------- */
 
-void FixPropertyGeneration::set_arrays(int i)
+void FixPropertyGeneration::set_arrays(int j)
 {
-  vprop[i] = 0.0;
+  vprop[j] = 0.0;
 }
 
 /* ----------------------------------------------------------------------

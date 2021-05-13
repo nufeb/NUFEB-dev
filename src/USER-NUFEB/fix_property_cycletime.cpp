@@ -67,10 +67,10 @@ void FixPropertyCycletime::compute()
    initialize one atom's array values, called when atom is created
 ------------------------------------------------------------------------- */
 
-void FixPropertyCycletime::set_arrays(int i)
+void FixPropertyCycletime::set_arrays(int j)
 {
-  aprop[i][0] = 0.0;
-  aprop[i][1] = 0.0;
+  aprop[j][0] = 0.0;
+  aprop[j][1] = 0.0;
 }
 
 /* ----------------------------------------------------------------------
