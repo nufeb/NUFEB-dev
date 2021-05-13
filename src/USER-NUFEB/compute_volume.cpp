@@ -40,19 +40,22 @@ ComputeVolume::ComputeVolume(LAMMPS *lmp, int narg, char **arg) :
 double ComputeVolume::compute_scalar()
 {
   invoked_scalar = update->ntimestep;
-
+  int *mask = atom->mask;
+  
   scalar = 0.0;
   for (int i = 0; i < atom->nlocal; i++) {
-    double r = atom->radius[i];
-    if (avec) {
-      int ibonus = atom->bacillus[i];
-      AtomVecBacillus::Bonus *bonus = &avec->bonus[ibonus];
+    if ((mask[i] & groupbit)) {
+        double r = atom->radius[i];
+        if (avec) {
+            int ibonus = atom->bacillus[i];
+            AtomVecBacillus::Bonus *bonus = &avec->bonus[ibonus];
 
-      double vsphere = FOURTHIRDSPI * r * r * r;
-      double vcylinder = MY_PI * r * r * bonus->length;
-      scalar += vsphere + vcylinder;
-    } else {
-      scalar += FOURTHIRDSPI * r * r * r;
+            double vsphere = FOURTHIRDSPI * r * r * r;
+            double vcylinder = MY_PI * r * r * bonus->length;
+            scalar += vsphere + vcylinder;
+        } else {
+            scalar += FOURTHIRDSPI * r * r * r;
+        }
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &scalar, 1, MPI_DOUBLE, MPI_SUM, world); 
