@@ -123,14 +123,13 @@ void FixProperty::copy_arrays(int i, int j, int /*delflag*/)
 
 int FixProperty::pack_exchange(int i, double *buf)
 {
-  int n = 0;
   if (size_peratom_cols > 0) {
     for (int m = 0; m < size_peratom_cols; m++)
-      buf[n++] = aprop[i][m];
+      buf[m] = aprop[i][m];
   } else {
-    buf[n++] = vprop[i];
+    buf[0] = vprop[i];
   }
-  return n;
+  return size_peratom_cols;
 }
 
 /* ----------------------------------------------------------------------
@@ -139,14 +138,13 @@ int FixProperty::pack_exchange(int i, double *buf)
 
 int FixProperty::unpack_exchange(int nlocal, double *buf)
 {
-  int n = 0;
   if (size_peratom_cols > 0) {
     for (int m = 0; m < size_peratom_cols; m++)
-      aprop[nlocal][m] = buf[n++];
+      aprop[nlocal][m] = buf[m];
   } else {
-    vprop[nlocal] = buf[n++];
+    vprop[nlocal] = buf[0];
   }
-  return n;
+  return size_peratom_cols;
 }
 
 /* ----------------------------------------------------------------------
@@ -155,15 +153,14 @@ int FixProperty::unpack_exchange(int nlocal, double *buf)
 
 int FixProperty::pack_restart(int i, double *buf)
 {
-  int n = 0;
-  buf[n++] = size_peratom_cols + 1;
+  buf[0] = size_peratom_cols + 1;
   if (size_peratom_cols > 0) {
     for (int m = 0; m < size_peratom_cols; m++)
-      buf[n++] = aprop[i][m];
+      buf[m+1] = aprop[i][m];
   } else {
     buf[1] = vprop[i];
   }
-  return n;
+  return size_peratom_cols + 1;
 }
 
 /* ----------------------------------------------------------------------
@@ -180,7 +177,7 @@ void FixProperty::unpack_restart(int nlocal, int nth)
   m++;
   if (size_peratom_cols > 0) {
     for (int i = 0; i < size_peratom_cols; i++)
-      aprop[nlocal][i] = extra[nlocal][m++];
+      aprop[nlocal][i] = extra[nlocal][m];
   } else {
     vprop[nlocal] = extra[nlocal][m];
   }
