@@ -29,12 +29,12 @@ class FixGasLiquid : public Fix {
   int compute_flag;
 
   FixGasLiquid(class LAMMPS *, int, char **);
-  virtual ~FixGasLiquid() {}
+  ~FixGasLiquid() {}
   int modify_param(int, char **);
-  virtual int setmask();
-  virtual void post_integrate();
-  virtual double compute_scalar();
-  virtual void compute();
+  int setmask();
+  void post_integrate();
+  double compute_scalar();
+  void compute();
 
  protected:
   int iliquid;
@@ -47,8 +47,6 @@ class FixGasLiquid : public Fix {
   double reactor_pres;
   double mw;
   double rg;
-
-  double rtotal;
 };
 
 }

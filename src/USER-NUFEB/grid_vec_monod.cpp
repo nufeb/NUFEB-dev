@@ -124,8 +124,10 @@ void GridVecMonod::unpack_exchange(int n, int *cells, double *buf)
 void GridVecMonod::set(int narg, char **arg)
 {
   if (narg != 3 && narg != 9) error->all(FLERR, "Invalid grid_modify set command");
-  if (narg == 3) set_monod(grid->find(arg[1]), force->numeric(FLERR, arg[2]));
-  else set_monod(grid->find(arg[1]), force->numeric(FLERR, arg[2]),
+  int isub = grid->find(arg[1]);
+  if (isub < 0) error->all(FLERR,"Cannot find substrate name");
+  if (narg == 3) set_monod(isub, force->numeric(FLERR, arg[2]));
+  else set_monod(isub, force->numeric(FLERR, arg[2]),
 		force->numeric(FLERR, arg[3]), force->numeric(FLERR, arg[4]),
 		force->numeric(FLERR, arg[5]), force->numeric(FLERR, arg[6]),
 		force->numeric(FLERR, arg[7]), force->numeric(FLERR, arg[8]));
@@ -144,26 +146,27 @@ void GridVecMonod::set_monod(int sub, double domain)
 
 /* ---------------------------------------------------------------------- */
 
-void GridVecMonod::set_monod(int sub, double domain, double nx, double px,
+void GridVecMonod::set_monod(int isub, double domain, double nx, double px,
 		       double ny, double py, double nz, double pz)
 {
   for (int i = 0; i < grid->ncells; i++) {
     if (!(mask[i] & CORNER_MASK)) {
       if (mask[i] & X_NB_MASK) {
-	conc[sub][i] = nx;
+	conc[isub][i] = nx;
       } else if (mask[i] & X_PB_MASK) {
-	conc[sub][i] = px;
+	conc[isub][i] = px;
       } else if (mask[i] & Y_NB_MASK) {
-	conc[sub][i] = ny;
+	conc[isub][i] = ny;
       } else if (mask[i] & Y_PB_MASK) {
-	conc[sub][i] = py;
+	conc[isub][i] = py;
       } else if (mask[i] & Z_NB_MASK) {
-	conc[sub][i] = nz;
+	conc[isub][i] = nz;
       } else if (mask[i] & Z_PB_MASK) {
-	conc[sub][i] = pz;
+	conc[isub][i] = pz;
       } else {
-	conc[sub][i] = domain;
+	conc[isub][i] = domain;
       }
     }
+    grid->reac[isub][i] = 0.0;
   }
 }

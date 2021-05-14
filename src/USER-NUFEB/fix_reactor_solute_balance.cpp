@@ -46,14 +46,14 @@ FixReactorSoluteBalance::FixReactorSoluteBalance(LAMMPS *lmp, int narg, char **a
 
   iliq = grid->find(arg[3]);
   if (iliq < 0)
-    error->all(FLERR, "Can't find substrate for reactor/solute_balance");
+    error->all(FLERR, "Can't find substrate name");
 
   int iarg = 4;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "q") == 0) {
       q = force->numeric(FLERR, arg[iarg+1]);
       iarg += 2;
-    } else if (strcmp(arg[iarg], "rvol") == 0) {
+    } else if (strcmp(arg[iarg], "reactor_vol") == 0) {
       rvol = force->numeric(FLERR, arg[iarg+1]);
       if (rvol <= 0)
         error->all(FLERR, "Bioreactor volume must be positive");
@@ -64,13 +64,15 @@ FixReactorSoluteBalance::FixReactorSoluteBalance(LAMMPS *lmp, int narg, char **a
         error->all(FLERR, "Reactor biofilm surface area cannot be negative");
       iarg += 2;
     } else if (strcmp(arg[iarg], "domain_af") == 0) {
-      if (strcmp(arg[iarg],"xy") == 0) {
+      if (strcmp(arg[iarg+1],"xy") == 0) {
 	domain_af = (domain->boxhi[0] - domain->boxlo[0]) * (domain->boxhi[1] - domain->boxlo[1]);
-      } else if (strcmp(arg[iarg],"yz") == 0) {
+      } else if (strcmp(arg[iarg+1],"yz") == 0) {
 	domain_af = (domain->boxhi[1] - domain->boxlo[1]) * (domain->boxhi[2] - domain->boxlo[2]);
-      } else if (strcmp(arg[iarg],"xz") == 0) {
+      } else if (strcmp(arg[iarg+1],"xz") == 0) {
 	domain_af = (domain->boxhi[0] - domain->boxlo[0]) * (domain->boxhi[2] - domain->boxlo[2]);
-      }
+      } else
+	 error->all(FLERR,"Illegal fix reactor/solute_balance command");
+      iarg += 2;
     }
   }
 }
@@ -83,7 +85,7 @@ void FixReactorSoluteBalance::init()
 }
 
 /* ----------------------------------------------------------------------
-   return concentration in bulk liquid
+   return solute concentration in bulk
 ------------------------------------------------------------------------- */
 
 double FixReactorSoluteBalance::compute_scalar()
@@ -91,7 +93,9 @@ double FixReactorSoluteBalance::compute_scalar()
   return grid->bulk[iliq];
 }
 
-/* ---------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------
+   update solute concentration in bulk
+------------------------------------------------------------------------- */
 
 void FixReactorSoluteBalance::compute()
 {
@@ -107,6 +111,6 @@ void FixReactorSoluteBalance::compute()
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &sum_reac, 1, MPI_DOUBLE, MPI_SUM, world);
-  // solve for the biomass balance in bulk liquid
+
   bulk[iliq] += ((q / rvol) * (inlet - bulk[iliq]) + ((reactor_af * sum_reac * vol) / (rvol * domain_af))) * update->dt;
 }

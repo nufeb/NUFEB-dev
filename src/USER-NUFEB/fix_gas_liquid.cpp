@@ -36,6 +36,9 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
   if (!grid->reactor_flag)
     error->all(FLERR,"Fix reactor requires nufeb/reactor grid style");
 
+  compute_flag = 1;
+  scalar_flag = 1;
+
   iliquid = -1;
   igas = -1;
 
@@ -47,8 +50,6 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
   mw = 1.0;
   rg = 1.0;
 
-  rtotal = 0.0;
-
   iliquid = grid->find(arg[3]);
   if (iliquid < 0)
     error->all(FLERR, "Can't find substrate(liquid) name");
@@ -59,7 +60,7 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
 
   int iarg = 5;
   while (iarg < narg) {
-    if (strcmp(arg[iarg], "kla") == 0) {
+    if (strcmp(arg[iarg], "kga") == 0) {
       kga = force->numeric(FLERR, arg[iarg+1]);
       iarg += 2;
     } else if (strcmp(arg[iarg], "h") == 0) {
@@ -96,9 +97,6 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
       error->all(FLERR, "Illegal fix nufeb/gas_liquid command");
     }
   }
-
-  compute_flag = 1;
-  scalar_flag = 1;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -146,12 +144,12 @@ double FixGasLiquid::compute_scalar()
 
   for (int i = 0; i < grid->ncells; i++) {
     if (!(grid->mask[i] & GHOST_MASK)) {
-      double p = grid->reac[igas][i];
-      result += p;
+      result -= grid->reac[igas][i] * reactor_vhead;
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &result, 1, MPI_DOUBLE, MPI_SUM, world);
-  result *= rg * temp / reactor_pres;
+  result /= reactor_pres;
+
   return result;
 }
 
@@ -163,15 +161,15 @@ void FixGasLiquid::compute()
   double **conc = grid->conc;
   double **reac = grid->reac;
   double p_g2l, n_l2g;
-
   double vol = grid->cell_size * grid->cell_size * grid->cell_size;
 
   for (int i = 0; i < grid->ncells; i++) {
     if (!(grid->mask[i] & GHOST_MASK)) {
       p_g2l = kga * (grid->bulk[igas] - conc[iliquid][i]/(h * mw));
-      n_l2g = -p_g2l * reactor_vhead / rg * temp;
+      n_l2g = -p_g2l * reactor_vhead / (rg * temp);
       // update reaction rates
       reac[igas][i] += p_g2l;
+      int a = reac[igas][i];
       reac[iliquid][i] += n_l2g * mw / vol;
     }
   }

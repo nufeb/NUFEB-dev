@@ -59,6 +59,7 @@ FixReactorGasBalance::FixReactorGasBalance(LAMMPS *lmp, int narg, char **arg) :
       reactor_vhead = force->numeric(FLERR, arg[iarg+1]);
       if (reactor_vhead <= 0)
 	error->all(FLERR, "Reactor headspace volume (reactor_vhead) must be positive");
+      iarg += 2;
     }
   }
 }
@@ -86,7 +87,7 @@ void FixReactorGasBalance::init()
 }
 
 /* ----------------------------------------------------------------------
-   return concentration in bulk liquid
+   return gas concentration in bulk
 ------------------------------------------------------------------------- */
 
 double FixReactorGasBalance::compute_scalar()
@@ -94,25 +95,31 @@ double FixReactorGasBalance::compute_scalar()
   return grid->bulk[igas];
 }
 
-/* ---------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------
+   update gas concentration in bulk
+------------------------------------------------------------------------- */
 
 void FixReactorGasBalance::compute()
 {
   double **reac = grid->reac;
   double *bulk = grid->bulk;
-  double sum_reac;
+  double sum_reac, ncells;
 
   for (int i = 0; i < nfix_gas_liquid; i++)
     q += fix_gas_liquid[i]->compute_scalar();
 
   sum_reac = 0;
+  ncells = 0;
+
   for (int i = 0; i < grid->ncells; i++) {
     if (!(grid->mask[i] & GHOST_MASK)) {
       sum_reac += reac[igas][i];
+      ncells++;
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &sum_reac, 1, MPI_DOUBLE, MPI_SUM, world);
+  MPI_Allreduce(MPI_IN_PLACE, &ncells, 1, MPI_INT, MPI_SUM, world);
 
-  // solve for the biomass balance in bulk liquid
-  bulk[igas] += (sum_reac - (q / reactor_vhead * grid->bulk[igas])) * update->dt;
+  bulk[igas] += (sum_reac / ncells - (q / reactor_vhead * bulk[igas])) * update->dt;
+
 }

@@ -127,16 +127,20 @@ void GridVecReactor::unpack_exchange(int n, int *cells, double *buf)
 void GridVecReactor::set(int narg, char **arg)
 {
   if (narg != 4) error->all(FLERR, "Invalid grid_modify set command");
-  set_reactor(grid->find(arg[1]), force->numeric(FLERR, arg[2]), force->numeric(FLERR, arg[3]));
+  int isub = grid->find(arg[1]);
+  if (isub < 0) error->all(FLERR,"Cannot find substrate name");
+  set_reactor(isub, force->numeric(FLERR, arg[2]), force->numeric(FLERR, arg[3]));
 }
 
 /* ---------------------------------------------------------------------- */
 
-void GridVecReactor::set_reactor(int sub, double domain, double cbulk)
+void GridVecReactor::set_reactor(int isub, double domain, double cbulk)
 {
   for (int i = 0; i < grid->ncells; i++) {
-    if (!(mask[i] & CORNER_MASK))
-      conc[sub][i] = domain;
+    if (!(mask[i] & CORNER_MASK)) {
+      conc[isub][i] = domain;
+    }
+    grid->reac[isub][i] = 0.0;
   }
-  bulk[sub] = cbulk;
+  bulk[isub] = cbulk;
 }

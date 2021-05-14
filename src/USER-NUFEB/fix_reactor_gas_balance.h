@@ -28,7 +28,7 @@ class FixReactorGasBalance : public FixReactor {
  public:
 
   FixReactorGasBalance(class LAMMPS *, int, char **);
-  virtual ~FixReactorGasBalance();
+  ~FixReactorGasBalance();
   double compute_scalar();
   virtual void init();
   virtual void compute();
