@@ -169,7 +169,6 @@ void FixGasLiquid::compute()
       n_l2g = -p_g2l * reactor_vhead / (rg * temp);
       // update reaction rates
       reac[igas][i] += p_g2l;
-      int a = reac[igas][i];
       reac[iliquid][i] += n_l2g * mw / vol;
     }
   }
