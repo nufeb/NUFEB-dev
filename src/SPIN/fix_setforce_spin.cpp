@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -21,20 +21,15 @@
    and molecular dynamics. Journal of Computational Physics.
 ------------------------------------------------------------------------- */
 
-#include <cstring>
-#include <cstdlib>
 #include "fix_setforce_spin.h"
 #include "atom.h"
 #include "update.h"
 #include "modify.h"
 #include "domain.h"
 #include "region.h"
-#include "respa.h"
 #include "input.h"
 #include "variable.h"
 #include "memory.h"
-#include "error.h"
-#include "force.h"
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -57,7 +52,7 @@ void FixSetForceSpin::post_force(int /*vflag*/)
 
   // update region if necessary
 
-  Region *region = NULL;
+  Region *region = nullptr;
   if (iregion >= 0) {
     region = domain->regions[iregion];
     region->prematch();
@@ -129,7 +124,7 @@ void FixSetForceSpin::single_setforce_spin(int i, double fmi[3])
 
   // update region if necessary
 
-  Region *region = NULL;
+  Region *region = nullptr;
   if (iregion >= 0) {
     region = domain->regions[iregion];
     region->prematch();
@@ -145,7 +140,7 @@ void FixSetForceSpin::single_setforce_spin(int i, double fmi[3])
 
   foriginal[0] = foriginal[1] = foriginal[2] = 0.0;
   force_flag = 0;
- 
+
   // constant force
 
   if (varflag == CONSTANT) {
@@ -200,7 +195,7 @@ void FixSetForceSpin::post_force_respa(int vflag, int ilevel, int /*iloop*/)
 
   if (ilevel == ilevel_respa) post_force(vflag);
   else {
-    Region *region = NULL;
+    Region *region = nullptr;
     if (iregion >= 0) {
       region = domain->regions[iregion];
       region->prematch();

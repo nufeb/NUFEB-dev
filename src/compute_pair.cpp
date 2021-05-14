@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -11,10 +11,10 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <mpi.h>
+#include "compute_pair.h"
+
 #include <cstring>
 #include <cctype>
-#include "compute_pair.h"
 #include "update.h"
 #include "force.h"
 #include "pair.h"
@@ -28,7 +28,7 @@ enum{EPAIR,EVDWL,ECOUL};
 
 ComputePair::ComputePair(LAMMPS *lmp, int narg, char **arg) :
   Compute(lmp, narg, arg),
-  pstyle(NULL), pair(NULL), one(NULL)
+  pstyle(nullptr), pair(nullptr), one(nullptr)
 {
   if (narg < 4) error->all(FLERR,"Illegal compute pair command");
 
@@ -48,7 +48,7 @@ ComputePair::ComputePair(LAMMPS *lmp, int narg, char **arg) :
 
   if (narg > iarg) {
     if (isdigit(arg[iarg][0])) {
-      nsub = force->inumeric(FLERR,arg[iarg]);
+      nsub = utils::inumeric(FLERR,arg[iarg],false,lmp);
       ++iarg;
       if (nsub <= 0)
         error->all(FLERR,"Illegal compute pair command");
@@ -82,7 +82,7 @@ ComputePair::ComputePair(LAMMPS *lmp, int narg, char **arg) :
     extvector = 1;
     one = new double[npair];
     vector = new double[npair];
-  } else one = vector = NULL;
+  } else one = vector = nullptr;
 }
 
 /* ---------------------------------------------------------------------- */

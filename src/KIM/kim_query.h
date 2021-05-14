@@ -51,7 +51,7 @@
 ------------------------------------------------------------------------- */
 
 /* ----------------------------------------------------------------------
-   Designed for use with the kim-api-2.0.2 (and newer) package
+   Designed for use with the kim-api-2.1.0 (and newer) package
 ------------------------------------------------------------------------- */
 
 #ifdef COMMAND_CLASS
@@ -71,7 +71,9 @@ class KimQuery : protected Pointers {
  public:
   KimQuery(class LAMMPS *lmp) : Pointers(lmp) {};
   void command(int, char **);
-
+ private:
+  void echo_var_assign(const std::string &name, const std::string &value)
+  const;
 };
 
 }

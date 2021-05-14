@@ -15,7 +15,7 @@
  ***************************************************************************/
 
 #include "lal_base_dipole.h"
-using namespace LAMMPS_AL;
+namespace LAMMPS_AL {
 #define BaseDipoleT BaseDipole<numtyp, acctyp>
 
 extern Device<PRECISION,ACC_PRECISION> global_device;
@@ -25,12 +25,17 @@ BaseDipoleT::BaseDipole() : _compiled(false), _max_bytes(0) {
   device=&global_device;
   ans=new Answer<numtyp,acctyp>();
   nbor=new Neighbor();
+  pair_program=nullptr;
+  ucl_device=nullptr;
 }
 
 template <class numtyp, class acctyp>
 BaseDipoleT::~BaseDipole() {
   delete ans;
   delete nbor;
+  k_pair_fast.clear();
+  k_pair.clear();
+  if (pair_program) delete pair_program;
 }
 
 template <class numtyp, class acctyp>
@@ -75,6 +80,8 @@ int BaseDipoleT::init_atomic(const int nlocal, const int nall,
   if (success!=0)
     return success;
 
+  if (ucl_device!=device->gpu) _compiled=false;
+
   ucl_device=device->gpu;
   atom=&device->atom;
 
@@ -113,19 +120,11 @@ void BaseDipoleT::clear_atomic() {
   device->output_times(time_pair,*ans,*nbor,avg_split,_max_bytes+_max_an_bytes,
                        _gpu_overhead,_driver_overhead,_threads_per_atom,screen);
 
-  if (_compiled) {
-    k_pair_fast.clear();
-    k_pair.clear();
-    delete pair_program;
-    _compiled=false;
-  }
-
   time_pair.clear();
   hd_balancer.clear();
 
   nbor->clear();
   ans->clear();
-  device->clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +139,7 @@ int * BaseDipoleT::reset_nbors(const int nall, const int inum, int *ilist,
   resize_atom(inum,nall,success);
   resize_local(inum,mn,success);
   if (!success)
-    return NULL;
+    return nullptr;
 
   nbor->get_host(inum,ilist,numj,firstneigh,block_size());
 
@@ -246,7 +245,7 @@ int** BaseDipoleT::compute(const int ago, const int inum_full,
     // Make sure textures are correct if realloc by a different hybrid style
     resize_atom(0,nall,success);
     zero_timers();
-    return NULL;
+    return nullptr;
   }
 
   hd_balancer.balance(cpu_time);
@@ -259,7 +258,7 @@ int** BaseDipoleT::compute(const int ago, const int inum_full,
     build_nbor_list(inum, inum_full-inum, nall, host_x, host_type,
                     sublo, subhi, tag, nspecial, special, success);
     if (!success)
-      return NULL;
+      return nullptr;
     atom->cast_q_data(host_q);
     atom->cast_quat_data(host_mu[0]);
     hd_balancer.start_timer();
@@ -299,6 +298,7 @@ void BaseDipoleT::compile_kernels(UCL_Device &dev, const void *pair_str,
     return;
 
   std::string s_fast=std::string(kname)+"_fast";
+  if (pair_program) delete pair_program;
   pair_program=new UCL_Program(dev);
   pair_program->load_string(pair_str,device->compile_string().c_str());
   k_pair_fast.set_function(*pair_program,s_fast.c_str());
@@ -311,4 +311,4 @@ void BaseDipoleT::compile_kernels(UCL_Device &dev, const void *pair_str,
 }
 
 template class BaseDipole<PRECISION,ACC_PRECISION>;
-
+}

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -50,7 +50,7 @@ public:
     // one ADIOS output variable we need to change every step
     adios2::Variable<double> varAtoms;
 };
-}
+} // namespace LAMMPS_NS
 
 /* ---------------------------------------------------------------------- */
 
@@ -58,8 +58,15 @@ DumpAtomADIOS::DumpAtomADIOS(LAMMPS *lmp, int narg, char **arg)
 : DumpAtom(lmp, narg, arg)
 {
     internal = new DumpAtomADIOSInternal();
-    internal->ad =
-        new adios2::ADIOS("adios2_config.xml", world, adios2::DebugON);
+    try {
+        internal->ad =
+            new adios2::ADIOS("adios2_config.xml", world, adios2::DebugON);
+    } catch (std::ios_base::failure &e) {
+        char str[256];
+        snprintf(str, sizeof(str), "ADIOS initialization failed with error: %s",
+                 e.what());
+        error->one(FLERR, str);
+    }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -183,7 +190,7 @@ void DumpAtomADIOS::write()
     if (sort_flag && sortcol == 0)
         pack(ids);
     else
-        pack(NULL);
+        pack(nullptr);
     if (sort_flag)
         sort();
 
@@ -248,14 +255,21 @@ void DumpAtomADIOS::init_style()
 
     // setup column string
 
-    if (scale_flag == 0 && image_flag == 0)
+    std::vector<std::string> columnNames;
+
+    if (scale_flag == 0 && image_flag == 0) {
         columns = (char *)"id type x y z";
-    else if (scale_flag == 0 && image_flag == 1)
+        columnNames = {"id", "type", "x", "y", "z"};
+    } else if (scale_flag == 0 && image_flag == 1) {
         columns = (char *)"id type x y z ix iy iz";
-    else if (scale_flag == 1 && image_flag == 0)
+        columnNames = {"id", "type", "x", "y", "z", "ix", "iy", "iz"};
+    } else if (scale_flag == 1 && image_flag == 0) {
         columns = (char *)"id type xs ys zs";
-    else if (scale_flag == 1 && image_flag == 1)
+        columnNames = {"id", "type", "xs", "ys", "zs"};
+    } else if (scale_flag == 1 && image_flag == 1) {
         columns = (char *)"id type xs ys zs ix iy iz";
+        columnNames = {"id", "type", "xs", "ys", "zs", "ix", "iy", "iz"};
+    }
 
     // setup function ptrs
 
@@ -316,13 +330,16 @@ void DumpAtomADIOS::init_style()
     int *boundaryptr = reinterpret_cast<int *>(domain->boundary);
     internal->io.DefineAttribute<int>("boundary", boundaryptr, 6);
 
-    internal->io.DefineAttribute<std::string>("columns", columns);
+    size_t nColumns = static_cast<size_t>(size_one);
+    internal->io.DefineAttribute<std::string>("columns", columnNames.data(),
+                                              nColumns);
+    internal->io.DefineAttribute<std::string>("columnstr", columns);
     internal->io.DefineAttribute<std::string>("boundarystr", boundstr);
     internal->io.DefineAttribute<std::string>("LAMMPS/dump_style", "atom");
     internal->io.DefineAttribute<std::string>("LAMMPS/version",
-                                              universe->version);
+                                              lmp->version);
     internal->io.DefineAttribute<std::string>("LAMMPS/num_ver",
-                                              universe->num_ver);
+                                              std::to_string(lmp->num_ver));
 
     internal->io.DefineVariable<uint64_t>(
         "nme", {adios2::LocalValueDim}); // local dimension variable
@@ -332,7 +349,6 @@ void DumpAtomADIOS::init_style()
     // atom table size is not known at the moment
     // it will be correctly defined at the moment of write
     size_t UnknownSizeYet = 1;
-    size_t nColumns = static_cast<size_t>(size_one);
     internal->varAtoms = internal->io.DefineVariable<double>(
         "atoms", {UnknownSizeYet, nColumns}, {UnknownSizeYet, 0},
         {UnknownSizeYet, nColumns});

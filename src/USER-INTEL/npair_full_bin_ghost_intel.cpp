@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -16,15 +16,13 @@
 ------------------------------------------------------------------------- */
 
 #include "npair_full_bin_ghost_intel.h"
-#include "neighbor.h"
-#include "nstencil.h"
-#include "neigh_list.h"
+
 #include "atom.h"
-#include "atom_vec.h"
 #include "comm.h"
-#include "domain.h"
-#include "molecule.h"
 #include "error.h"
+#include "molecule.h"
+#include "neigh_list.h"
+#include "neighbor.h"
 
 using namespace LAMMPS_NS;
 
@@ -90,7 +88,7 @@ void NPairFullBinGhostIntel::fbi(NeighList * list,
                      _fix->nbor_pack_width());
 
   int need_ic = 0;
-  if (atom->molecular)
+  if (atom->molecular != Atom::ATOMIC)
     dminimum_image_check(need_ic, neighbor->cutneighmax, neighbor->cutneighmax,
                          neighbor->cutneighmax);
 
@@ -121,11 +119,11 @@ void NPairFullBinGhostIntel::fbi(const int offload, NeighList * list,
   const int e_nall = nall_t;
 
   const int molecular = atom->molecular;
-  int *ns = NULL;
-  tagint *s = NULL;
+  int *ns = nullptr;
+  tagint *s = nullptr;
   int tag_size = 0, special_size;
   if (buffers->need_tag()) tag_size = e_nall;
-  if (molecular) {
+  if (molecular != Atom::ATOMIC) {
     s = atom->special[0];
     ns = atom->nspecial[0];
     special_size = aend;
@@ -150,19 +148,19 @@ void NPairFullBinGhostIntel::fbi(const int offload, NeighList * list,
   const int nlocal = atom->nlocal;
 
   #ifndef _LMP_INTEL_OFFLOAD
-  int * const mask = atom->mask;
-  tagint * const molecule = atom->molecule;
+  int * _noalias const mask = atom->mask;
+  tagint * _noalias const molecule = atom->molecule;
   #endif
 
   int moltemplate;
-  if (molecular == 2) moltemplate = 1;
+  if (molecular == Atom::TEMPLATE) moltemplate = 1;
   else moltemplate = 0;
   if (moltemplate)
     error->all(FLERR,
                "Can't use moltemplate with npair style full/bin/ghost/intel.");
 
   int tnum;
-  int *overflow;
+  int * _noalias overflow;
   #ifdef _LMP_INTEL_OFFLOAD
   double *timer_compute;
   if (offload) {
@@ -200,7 +198,7 @@ void NPairFullBinGhostIntel::fbi(const int offload, NeighList * list,
   const int mbinx = this->mbinx;
   const int mbiny = this->mbiny;
   const int mbinz = this->mbinz;
-  const int * const stencilxyz = &this->stencilxyz[0][0];
+  const int * _noalias const stencilxyz = &this->stencilxyz[0][0];
 
   int sb = 1;
   if (special_flag[1] == 0) {
@@ -295,7 +293,7 @@ void NPairFullBinGhostIntel::fbi(const int offload, NeighList * list,
 
       int pack_offset = maxnbors;
       int ct = (ifrom + tid * 2) * maxnbors;
-      int *neighptr = intel_list + ct;
+      int * _noalias neighptr = intel_list + ct;
       const int obound = pack_offset + maxnbors * 2;
 
       const int toffs = tid * ncache_stride;
@@ -370,7 +368,7 @@ void NPairFullBinGhostIntel::fbi(const int offload, NeighList * list,
 
         int n = maxnbors;
         int n2 = n * 2;
-        int *neighptr2 = neighptr;
+        int * _noalias neighptr2 = neighptr;
         const flt_t * _noalias cutsq;
         if (i < nlocal) cutsq = cutneighsq;
         else cutsq = cutneighghostsq;
@@ -422,7 +420,7 @@ void NPairFullBinGhostIntel::fbi(const int offload, NeighList * list,
           }
         } // for u
 
-        if (molecular && i < nlocal) {
+        if ((molecular != Atom::ATOMIC) && (i < nlocal)) {
           int alln = n;
           n = 0;
           #if defined(LMP_SIMD_COMPILER)

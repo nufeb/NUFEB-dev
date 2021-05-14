@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -124,7 +124,7 @@ public:
     // (individual list of 'columns' string)
     std::vector<std::string> columnNames;
 };
-}
+} // namespace LAMMPS_NS
 
 /* ---------------------------------------------------------------------- */
 
@@ -132,8 +132,15 @@ DumpCustomADIOS::DumpCustomADIOS(LAMMPS *lmp, int narg, char **arg)
 : DumpCustom(lmp, narg, arg)
 {
     internal = new DumpCustomADIOSInternal();
-    internal->ad =
-        new adios2::ADIOS("adios2_config.xml", world, adios2::DebugON);
+    try {
+        internal->ad =
+            new adios2::ADIOS("adios2_config.xml", world, adios2::DebugON);
+    } catch (std::ios_base::failure &e) {
+        char str[256];
+        snprintf(str, sizeof(str), "ADIOS initialization failed with error: %s",
+                 e.what());
+        error->one(FLERR, str);
+    }
 
     // if (screen) fprintf(screen, "DumpCustomADIOS constructor: nvariable=%d
     // id_variable=%p, variables=%p, nfield=%d, earg=%p\n", nvariable,
@@ -267,7 +274,7 @@ void DumpCustomADIOS::write()
     if (sort_flag && sortcol == 0)
         pack(ids);
     else
-        pack(NULL);
+        pack(nullptr);
     if (sort_flag)
         sort();
 
@@ -415,11 +422,11 @@ void DumpCustomADIOS::init_style()
         "columns", internal->columnNames.data(), nColumns);
     internal->io.DefineAttribute<std::string>("columnstr", columns);
     internal->io.DefineAttribute<std::string>("boundarystr", boundstr);
-    internal->io.DefineAttribute<std::string>("LAMMPS/dump_style", "atom");
+    internal->io.DefineAttribute<std::string>("LAMMPS/dump_style", "custom");
     internal->io.DefineAttribute<std::string>("LAMMPS/version",
-                                              universe->version);
+                                              lmp->version);
     internal->io.DefineAttribute<std::string>("LAMMPS/num_ver",
-                                              universe->num_ver);
+                                              std::to_string(lmp->num_ver));
 
     internal->io.DefineVariable<uint64_t>(
         "nme", {adios2::LocalValueDim}); // local dimension variable

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -340,11 +340,11 @@ struct DomainPBCFunctor {
 
 void DomainKokkos::pbc()
 {
- 
+
   if (lmp->kokkos->exchange_comm_classic) {
- 
+
    // reduce GPU data movement
- 
+
     atomKK->sync(Host,X_MASK|V_MASK|MASK_MASK|IMAGE_MASK);
     Domain::pbc();
     atomKK->modified(Host,X_MASK|V_MASK|MASK_MASK|IMAGE_MASK);

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -18,31 +18,21 @@
 
 /* ----------------------------------------------------------------------
    Contributing authors: Lionel Constantin (EPFL), David M. Wilkins (EPFL),
-			 Michele Ceriotti (EPFL)
+                         Michele Ceriotti (EPFL)
 ------------------------------------------------------------------------- */
 
-#include <mpi.h>
+#include "fix_ffl.h"
+
 #include <cmath>
 #include <cstring>
-#include <cstdlib>
-#include "fix_ffl.h"
-#include "math_extra.h"
 #include "atom.h"
-#include "atom_vec_ellipsoid.h"
 #include "force.h"
 #include "update.h"
-#include "modify.h"
-#include "compute.h"
-#include "domain.h"
-#include "region.h"
 #include "respa.h"
 #include "comm.h"
-#include "input.h"
-#include "variable.h"
 #include "random_mars.h"
 #include "memory.h"
 #include "error.h"
-#include "group.h"
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -74,21 +64,22 @@ FixFFL::FixFFL(LAMMPS *lmp, int narg, char **arg) :
   time_integrate = 1;
   scalar_flag = 1;
 
-  //gamma = 1/ time constant(tau)
-  if (force->numeric(FLERR,arg[3]) <= 0)
+  //gamma = 1 / time constant(tau)
+  gamma = utils::numeric(FLERR,arg[3],false,lmp);
+  if (gamma <= 0.0)
     error->all(FLERR,"Illegal fix ffl tau value, should be greater than 0");
-  gamma = 1.0/force->numeric(FLERR,arg[3]);
+  gamma = 1.0/gamma;
   ffl_every=1;
   ffl_step=0;
 
   // start temperature (t ramp)
-  t_start = force->numeric(FLERR,arg[4]);
+  t_start = utils::numeric(FLERR,arg[4],false,lmp);
 
   // final temperature (t ramp)
-  t_stop = force->numeric(FLERR,arg[5]);
+  t_stop = utils::numeric(FLERR,arg[5],false,lmp);
 
   // PRNG seed
-  int seed = force->inumeric(FLERR,arg[6]);
+  int seed = utils::inumeric(FLERR,arg[6],false,lmp);
 
   // Flip type used, uses rescale if no flip is given
   if (narg == 8) {
@@ -115,17 +106,17 @@ FixFFL::FixFFL(LAMMPS *lmp, int narg, char **arg) :
   random = new RanMars(lmp,seed + comm->me);
 
   // allocate per-type arrays for mass-scaling
-  sqrt_m=NULL;
+  sqrt_m=nullptr;
   memory->grow(sqrt_m, atom->ntypes+1,"ffl:sqrt_m");
 
   // allocates space for temporaries
-  ffl_tmp1=ffl_tmp2=NULL;
+  ffl_tmp1=ffl_tmp2=nullptr;
 
   grow_arrays(atom->nmax);
 
   // add callbacks to enable restarts
-  atom->add_callback(0);
-  atom->add_callback(1);
+  atom->add_callback(Atom::GROW);
+  atom->add_callback(Atom::RESTART);
 
   energy = 0.0;
 }
@@ -136,8 +127,8 @@ FixFFL::FixFFL(LAMMPS *lmp, int narg, char **arg) :
 FixFFL::~FixFFL() {
   delete random;
 
-  atom->delete_callback(id,0);
-  atom->delete_callback(id,1);
+  atom->delete_callback(id,Atom::GROW);
+  atom->delete_callback(id,Atom::RESTART);
 
   memory->destroy(sqrt_m);
   memory->destroy(ffl_tmp1);
@@ -435,7 +426,7 @@ void *FixFFL::extract(const char *str, int &dim) {
   if (strcmp(str,"t_target") == 0) {
     return &t_target;
   }
-  return NULL;
+  return nullptr;
 }
 
 

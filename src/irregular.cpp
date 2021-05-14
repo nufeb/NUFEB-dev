@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -11,15 +11,17 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <mpi.h>
-#include <cstdlib>
-#include <cstring>
 #include "irregular.h"
+
 #include "atom.h"
 #include "atom_vec.h"
-#include "domain.h"
 #include "comm.h"
+#include "domain.h"
+#include "fix.h"
 #include "memory.h"
+#include "modify.h"
+
+#include <cstring>
 
 using namespace LAMMPS_NS;
 
@@ -29,14 +31,13 @@ using namespace LAMMPS_NS;
 int *Irregular::proc_recv_copy;
 static int compare_standalone(const void *, const void *);
 #else
-#include "mergesort.h"
 // prototype for non-class function
 static int compare_standalone(const int, const int, void *);
 #endif
 
 #define BUFFACTOR 1.5
-#define BUFMIN 1000
-#define BUFEXTRA 1000
+#define BUFMIN 1024
+#define BUFEXTRA 1024
 
 /* ---------------------------------------------------------------------- */
 
@@ -51,15 +52,15 @@ Irregular::Irregular(LAMMPS *lmp) : Pointers(lmp)
   // migrate work vectors
 
   maxlocal = 0;
-  mproclist = NULL;
-  msizes = NULL;
+  mproclist = nullptr;
+  msizes = nullptr;
 
   // send buffers
 
   maxdbuf = 0;
-  dbuf = NULL;
+  dbuf = nullptr;
   maxbuf = 0;
-  buf = NULL;
+  buf = nullptr;
 
   // universal work vectors
 
@@ -69,9 +70,10 @@ Irregular::Irregular(LAMMPS *lmp) : Pointers(lmp)
   // initialize buffers for migrate atoms, not used for datum comm
   // these can persist for multiple irregular operations
 
-  maxsend = BUFMIN;
-  memory->create(buf_send,maxsend+BUFEXTRA,"comm:buf_send");
-  maxrecv = BUFMIN;
+  buf_send = buf_recv = nullptr;
+  maxsend = maxrecv = BUFMIN;
+  bufextra = BUFEXTRA;
+  grow_send(maxsend,2);
   memory->create(buf_recv,maxrecv,"comm:buf_recv");
 }
 
@@ -103,6 +105,13 @@ Irregular::~Irregular()
 
 void Irregular::migrate_atoms(int sortflag, int preassign, int *procassign)
 {
+  // check if buf_send needs to be extended due to atom style or per-atom fixes
+  // same as in Comm::exchange()
+
+  int bufextra_old = bufextra;
+  init_exchange();
+  if (bufextra > bufextra_old) grow_send(maxsend+bufextra,2);
+
   // clear global->local map since atoms move to new procs
   // clear old ghosts so map_set() at end will operate only on local atoms
   // exchange() doesn't need to clear ghosts b/c borders()
@@ -431,7 +440,7 @@ int Irregular::create_atom(int n, int *sizes, int *proclist, int sortflag)
     proc_recv_copy = proc_recv;
     qsort(order,nrecv_proc,sizeof(int),compare_standalone);
 #else
-    merge_sort(order,nrecv_proc,(void *)proc_recv,compare_standalone);
+    utils::merge_sort(order,nrecv_proc,(void *)proc_recv,compare_standalone);
 #endif
 
     int j;
@@ -705,7 +714,7 @@ int Irregular::create_data(int n, int *proclist, int sortflag)
     proc_recv_copy = proc_recv;
     qsort(order,nrecv_proc,sizeof(int),compare_standalone);
 #else
-    merge_sort(order,nrecv_proc,(void *)proc_recv,compare_standalone);
+    utils::merge_sort(order,nrecv_proc,(void *)proc_recv,compare_standalone);
 #endif
 
     int j;
@@ -879,7 +888,7 @@ int Irregular::create_data_grouped(int n, int *procs, int sortflag)
     proc_recv_copy = proc_recv;
     qsort(order,nrecv_proc,sizeof(int),compare_standalone);
 #else
-    merge_sort(order,nrecv_proc,(void *)proc_recv,compare_standalone);
+    utils::merge_sort(order,nrecv_proc,(void *)proc_recv,compare_standalone);
 #endif
 
     int j;
@@ -983,24 +992,52 @@ void Irregular::destroy_data()
 }
 
 /* ----------------------------------------------------------------------
-   realloc the size of the send buffer as needed with BUFFACTOR & BUFEXTRA
-   if flag = 1, realloc
-   if flag = 0, don't need to realloc with copy, just free/malloc
+   set bufextra based on AtomVec and fixes
+   similar to Comm::init_exchange()
+------------------------------------------------------------------------- */
+
+void Irregular::init_exchange()
+{
+  int nfix = modify->nfix;
+  Fix **fix = modify->fix;
+
+  int onefix;
+  int maxexchange_fix = 0;
+  for (int i = 0; i < nfix; i++) {
+    onefix = fix[i]->maxexchange;
+    maxexchange_fix = MAX(maxexchange_fix,onefix);
+  }
+
+  int maxexchange = atom->avec->maxexchange + maxexchange_fix;
+  bufextra = maxexchange + BUFEXTRA;
+}
+
+/* ----------------------------------------------------------------------
+   realloc the size of the send buffer as needed with BUFFACTOR and bufextra
+   flag = 0, don't need to realloc with copy, just free/malloc w/ BUFFACTOR
+   flag = 1, realloc with BUFFACTOR
+   flag = 2, free/malloc w/out BUFFACTOR
+   same as Comm::grow_send()
 ------------------------------------------------------------------------- */
 
 void Irregular::grow_send(int n, int flag)
 {
-  maxsend = static_cast<int> (BUFFACTOR * n);
-  if (flag)
-    memory->grow(buf_send,maxsend+BUFEXTRA,"comm:buf_send");
-  else {
+  if (flag == 0) {
+    maxsend = static_cast<int> (BUFFACTOR * n);
     memory->destroy(buf_send);
-    memory->create(buf_send,maxsend+BUFEXTRA,"comm:buf_send");
+    memory->create(buf_send,maxsend+bufextra,"comm:buf_send");
+  } else if (flag == 1) {
+    maxsend = static_cast<int> (BUFFACTOR * n);
+    memory->grow(buf_send,maxsend+bufextra,"comm:buf_send");
+  } else {
+    memory->destroy(buf_send);
+    memory->grow(buf_send,maxsend+bufextra,"comm:buf_send");
   }
 }
 
 /* ----------------------------------------------------------------------
    free/malloc the size of the recv buffer as needed with BUFFACTOR
+   same as Comm::grow_recv()
 ------------------------------------------------------------------------- */
 
 void Irregular::grow_recv(int n)
@@ -1014,9 +1051,9 @@ void Irregular::grow_recv(int n)
    return # of bytes of allocated memory
 ------------------------------------------------------------------------- */
 
-bigint Irregular::memory_usage()
+double Irregular::memory_usage()
 {
-  bigint bytes = 0;
+  double bytes = 0;
   bytes += maxsend*sizeof(double);   // buf_send
   bytes += maxrecv*sizeof(double);   // buf_recv
   bytes += maxdbuf*sizeof(double);   // dbuf

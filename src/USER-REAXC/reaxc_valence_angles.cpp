@@ -21,12 +21,13 @@
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
   See the GNU General Public License for more details:
-  <http://www.gnu.org/licenses/>.
+  <https://www.gnu.org/licenses/>.
   ----------------------------------------------------------------------*/
 
-#include "pair_reaxc.h"
 #include "reaxc_valence_angles.h"
-#include "reaxc_bond_orders.h"
+#include <cmath>
+#include "pair.h"
+#include "reaxc_defs.h"
 #include "reaxc_list.h"
 #include "reaxc_vector.h"
 

@@ -21,18 +21,15 @@
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
   See the GNU General Public License for more details:
-  <http://www.gnu.org/licenses/>.
+  <https://www.gnu.org/licenses/>.
   ----------------------------------------------------------------------*/
 
-#include "pair_reaxc.h"
-#include "update.h"
 #include "reaxc_io_tools.h"
-#include "reaxc_list.h"
-#include "reaxc_reset_tools.h"
+#include <cstdio>
+#include <cstring>
+#include "reaxc_defs.h"
 #include "reaxc_system_props.h"
-#include "reaxc_tool_box.h"
 #include "reaxc_traj.h"
-#include "reaxc_vector.h"
 
 int Init_Output_Files( reax_system *system, control_params *control,
                        output_controls *out_control, mpi_datatypes *mpi_data,
@@ -53,7 +50,7 @@ int Init_Output_Files( reax_system *system, control_params *control,
 
       /* init potentials file */
       sprintf( temp, "%s.pot", control->sim_name );
-      if ((out_control->pot = fopen( temp, "w" )) != NULL) {
+      if ((out_control->pot = fopen( temp, "w" )) != nullptr) {
         fflush( out_control->pot );
       } else {
         strcpy( msg, "init_out_controls: .pot file could not be opened\n" );
@@ -68,7 +65,7 @@ int Init_Output_Files( reax_system *system, control_params *control,
         control->ensemble == iNPT ||
         control->ensemble == sNPT ) {
       sprintf( temp, "%s.prs", control->sim_name );
-      if ((out_control->prs = fopen( temp, "w" )) != NULL) {
+      if ((out_control->prs = fopen( temp, "w" )) != nullptr) {
         fprintf(out_control->prs,"%8s%13s%13s%13s%13s%13s%13s%13s\n",
                 "step", "Pint/norm[x]", "Pint/norm[y]", "Pint/norm[z]",
                 "Pext/Ptot[x]", "Pext/Ptot[y]", "Pext/Ptot[z]", "Pkin/V" );
@@ -85,7 +82,7 @@ int Init_Output_Files( reax_system *system, control_params *control,
 
 
 /************************ close output files ************************/
-int Close_Output_Files( reax_system *system, control_params *control,
+int Close_Output_Files( reax_system *system, control_params * /* control */,
                         output_controls *out_control, mpi_datatypes * /*mpi_data*/ )
 {
   if (out_control->write_steps > 0)
@@ -94,12 +91,12 @@ int Close_Output_Files( reax_system *system, control_params *control,
   if (system->my_rank == MASTER_NODE) {
     if (out_control->pot) {
       fclose( out_control->pot );
-      out_control->pot = NULL;
+      out_control->pot = nullptr;
     }
 
     if (out_control->prs) {
       fclose(out_control->prs);
-      out_control->prs = NULL;
+      out_control->prs = nullptr;
     }
   }
 

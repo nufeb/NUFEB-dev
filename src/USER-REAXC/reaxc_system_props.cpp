@@ -21,14 +21,12 @@
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
   See the GNU General Public License for more details:
-  <http://www.gnu.org/licenses/>.
+  <https://www.gnu.org/licenses/>.
   ----------------------------------------------------------------------*/
 
-#include "pair_reaxc.h"
 #include "reaxc_system_props.h"
-#include "reaxc_tool_box.h"
-#include "reaxc_vector.h"
-
+#include <mpi.h>
+#include "reaxc_defs.h"
 
 void Compute_System_Energy( reax_system *system, simulation_data *data,
                             MPI_Comm comm )

@@ -14,6 +14,7 @@
 #ifndef LMP_LAMMPS_H
 #define LMP_LAMMPS_H
 
+#include <mpi.h>
 #include <cstdio>
 
 namespace LAMMPS_NS {
@@ -36,6 +37,12 @@ class LAMMPS {
   class Group *group;            // groups of atoms
   class Output *output;          // thermo/dump/restart
   class Timer *timer;            // CPU timing info
+
+  const char *version;           // LAMMPS version string = date
+  int num_ver;                   // numeric version id derived from *version*
+                                 // that is constructed so that will be greater
+                                 // for newer versions in numeric or string
+                                 // value comparisons
 
   MPI_Comm world;                // MPI communicator
   FILE *infile;                  // infile
@@ -92,8 +99,10 @@ class LAMMPS {
   struct package_styles_lists *pkg_lists;
   void init_pkg_lists();
   void help();
-  LAMMPS() {};                   // prohibit using the default constructor
-  LAMMPS(const LAMMPS &) {};     // prohibit using the copy constructor
+  /// Default constructor. Declared private to prohibit its use
+  LAMMPS() {};
+  /// Copy constructor. Declared private to prohibit its use
+  LAMMPS(const LAMMPS &) {};
 };
 
 }

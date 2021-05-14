@@ -32,10 +32,13 @@ class KokkosLMP : protected Pointers {
   int exchange_comm_on_host;
   int forward_comm_on_host;
   int reverse_comm_on_host;
+  int exchange_comm_changed;
+  int forward_comm_changed;
+  int reverse_comm_changed;
   int nthreads,ngpus;
   int numa;
   int auto_sync;
-  int gpu_direct_flag;
+  int gpu_aware_flag;
   int neigh_thread;
   int neigh_thread_set;
   int newtonflag;
@@ -52,7 +55,7 @@ class KokkosLMP : protected Pointers {
     int value = 0;
 
     if (neighflag == HALFTHREAD)
-      value = NeedDup<HALFTHREAD,DeviceType>::value;
+      value = std::is_same<typename NeedDup<HALFTHREAD,DeviceType>::value,Kokkos::Experimental::ScatterDuplicated>::value;
 
     return value;
   }
@@ -70,6 +73,11 @@ class KokkosLMP : protected Pointers {
 E: Invalid Kokkos command-line args
 
 Self-explanatory.  See Section 2.7 of the manual for details.
+
+E: Could not determine local MPI rank for multiple GPUs with Kokkos CUDA
+because MPI library not recognized
+
+The local MPI rank was not found in one of four supported environment variables.
 
 E: GPUs are requested but Kokkos has not been compiled for CUDA
 

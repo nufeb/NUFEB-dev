@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -11,11 +11,10 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <mpi.h>
 #include "lammps.h"
 #include "input.h"
-#include "error.h"
-#include <cstdio>
+
+#include <mpi.h>
 #include <cstdlib>
 
 #if defined(LAMMPS_WAIT_GDB_ATTACH)
@@ -26,8 +25,8 @@
 #include <fenv.h>
 #endif
 
-#ifdef FFT_FFTW3
-#include <fftw3.h>
+#if defined(LAMMPS_EXCEPTIONS)
+#include "exceptions.h"
 #endif
 
 using namespace LAMMPS_NS;
@@ -69,9 +68,10 @@ int main(int argc, char **argv)
     LAMMPS *lammps = new LAMMPS(argc,argv,MPI_COMM_WORLD);
     lammps->input->file();
     delete lammps;
-  } catch(LAMMPSAbortException & ae) {
+  } catch(LAMMPSAbortException &ae) {
     MPI_Abort(ae.universe, 1);
-  } catch(LAMMPSException & e) {
+  } catch(LAMMPSException &e) {
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     exit(1);
   }
@@ -82,14 +82,4 @@ int main(int argc, char **argv)
 #endif
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
-
-#ifdef FFT_FFTW3
-  // tell fftw3 to delete its global memory pool
-  // and thus avoid bogus valgrind memory leak reports
-#ifdef FFT_SINGLE
-  fftwf_cleanup();
-#else
-  fftw_cleanup();
-#endif
-#endif
 }

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -14,16 +14,14 @@
    contact: stevene.strong at gmail dot com
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-
 #include "pair_e3b.h"
+
+#include <cmath>
+#include <cstring>
+#include <algorithm>
 
 #include "atom.h"
 #include "neighbor.h"
-#include "neigh_request.h"
 #include "neigh_list.h"
 #include "force.h"
 #include "comm.h"
@@ -33,7 +31,7 @@
 #include "domain.h"
 #include "citeme.h"
 
-//these are defined here to avoid confusing hardcoded indicies, but
+//these are defined here to avoid confusing hardcoded indices, but
 //they do not allow flexibility. If they are changed the code will break
 #define DIM 3
 #define NUMH 2  //number of hydrogen atoms per water molecule
@@ -52,12 +50,12 @@ PairE3B::PairE3B(LAMMPS *lmp) : Pair(lmp),pairPerAtom(10)
   pvector = new double[nextra];
 
   allocatedE3B = false;
-  pairO  = NULL;
-  pairH  = NULL;
-  exps   = NULL;
-  del3   = NULL;
-  fpair3 = NULL;
-  sumExp = NULL;
+  pairO  = nullptr;
+  pairH  = nullptr;
+  exps   = nullptr;
+  del3   = nullptr;
+  fpair3 = nullptr;
+  sumExp = nullptr;
 }
 
 /* ----------------------------------------------------------------------
@@ -383,9 +381,7 @@ void PairE3B::allocateE3B()
 void PairE3B::settings(int narg, char **arg)
 {
   if (narg != 1) error->all(FLERR,"Illegal pair_style command");
-  typeO=force->inumeric(FLERR,arg[0]);
-  if (typeO<1 || typeO>atom->ntypes)
-    error->all(FLERR,"Invalid Otype: out of bounds");
+  typeO=utils::inumeric(FLERR,arg[0],false,lmp);
 }
 
 /* ----------------------------------------------------------------------
@@ -425,29 +421,29 @@ void PairE3B::coeff(int narg, char **arg)
   while(iarg < narg) {
     char *keyword = arg[iarg++];
     if (checkKeyword(keyword,"Ea",1,narg-iarg))
-      ea=force->numeric(FLERR,arg[iarg++]);
+      ea=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"Eb",1,narg-iarg))
-      eb=force->numeric(FLERR,arg[iarg++]);
+      eb=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"Ec",1,narg-iarg))
-      ec=force->numeric(FLERR,arg[iarg++]);
+      ec=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"K3",1,narg-iarg))
-      k3=force->numeric(FLERR,arg[iarg++]);
+      k3=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"Rs",1,narg-iarg))
-      rs=force->numeric(FLERR,arg[iarg++]);
+      rs=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"Rc3",1,narg-iarg))
-      rc3=force->numeric(FLERR,arg[iarg++]);
+      rc3=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"Rc2",1,narg-iarg))
-      rc2=force->numeric(FLERR,arg[iarg++]);
+      rc2=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"bondL",1,narg-iarg))
-      bondL=force->numeric(FLERR,arg[iarg++]);
+      bondL=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"E2",1,narg-iarg))
-      e2=force->numeric(FLERR,arg[iarg++]);
+      e2=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"K2",1,narg-iarg))
-      k2=force->numeric(FLERR,arg[iarg++]);
+      k2=utils::numeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"neigh",1,narg-iarg))
-      pairPerAtom=force->inumeric(FLERR,arg[iarg++]);
+      pairPerAtom=utils::inumeric(FLERR,arg[iarg++],false,lmp);
     else if (checkKeyword(keyword,"preset",1,narg-iarg)) {
-      presetFlag=force->inumeric(FLERR,arg[iarg++]);
+      presetFlag=utils::inumeric(FLERR,arg[iarg++],false,lmp);
       presetParam(presetFlag,repeatFlag,bondL);
     } else {
       char str[256];
@@ -479,6 +475,8 @@ void PairE3B::init_style()
     error->all(FLERR,"Pair style E3B requires atom IDs");
   if (force->newton_pair == 0)
     error->all(FLERR,"Pair style E3B requires newton pair on");
+  if (typeO<1 || typeO>atom->ntypes)
+    error->all(FLERR,"Invalid Otype: out of bounds");
 
   // need a half neighbor list
   neighbor->request(this,instance_me);
@@ -541,7 +539,7 @@ void PairE3B::presetParam(const int flag,bool &repeatFlag,double &bondL) {
       bondL!=0.0 || rs!=0.0 || rc3!=0.0 || rc2!=0.0 )
     error->all(FLERR,"Preset keyword will overwrite another keyword setting");
 
-  double econv,lconv;
+  double econv=1.0,lconv=1.0;
   if (strcmp(update->unit_style,"real") == 0) {
     econv=1.0/4.184;
     lconv=1.0;

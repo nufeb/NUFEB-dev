@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -15,21 +15,18 @@
    Contributing authors: Frances Mackay, Santtu Ollila, Colin Denniston (UWO)
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstdio>
-#include <cstring>
 #include "fix_lb_pc.h"
+#include <cmath>
+#include <cstring>
 #include "atom.h"
 #include "force.h"
 #include "update.h"
-#include "respa.h"
 #include "error.h"
 #include "memory.h"
-#include "comm.h"
 #include "domain.h"
 #include "fix_lb_fluid.h"
 #include "modify.h"
-#include <mpi.h>
+
 #include "group.h"
 
 using namespace LAMMPS_NS;
@@ -48,11 +45,11 @@ FixLbPC::FixLbPC(LAMMPS *lmp, int narg, char **arg) :
   // perform initial allocation of atom-based array
   // register with Atom class
 
-  force_old = NULL;
-  up = NULL;
-  up_old = NULL;
+  force_old = nullptr;
+  up = nullptr;
+  up_old = nullptr;
   grow_arrays(atom->nmax);
-  atom->add_callback(0);
+  atom->add_callback(Atom::GROW);
 
   Gamma_MD = new double[atom->ntypes+1];
 
@@ -79,7 +76,7 @@ FixLbPC::FixLbPC(LAMMPS *lmp, int narg, char **arg) :
 
 FixLbPC::~FixLbPC() {
 
-  atom->delete_callback(id,0);
+  atom->delete_callback(id,Atom::GROW);
 
   memory->destroy(force_old);
   memory->destroy(up);

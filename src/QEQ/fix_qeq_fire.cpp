@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -15,26 +15,23 @@
    Contributing author: Ray Shan (Sandia)
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include "fix_qeq_fire.h"
+
+#include <cmath>
+
+#include <cstring>
 #include "atom.h"
 #include "comm.h"
-#include "domain.h"
 #include "neighbor.h"
 #include "neigh_list.h"
 #include "neigh_request.h"
 #include "update.h"
 #include "force.h"
 #include "group.h"
-#include "pair.h"
 #include "pair_comb.h"
 #include "pair_comb3.h"
 #include "kspace.h"
 #include "respa.h"
-#include "memory.h"
 #include "error.h"
 
 using namespace LAMMPS_NS;
@@ -69,8 +66,8 @@ FixQEqFire::FixQEqFire(LAMMPS *lmp, int narg, char **arg) :
     } else error->all(FLERR,"Illegal fix qeq/fire command");
   }
 
-  comb = NULL;
-  comb3 = NULL;
+  comb = nullptr;
+  comb3 = nullptr;
 }
 
 /* ---------------------------------------------------------------------- */

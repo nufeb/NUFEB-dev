@@ -2,36 +2,37 @@
 // Created by charlie sievers on 6/21/18.
 //
 
-#include <mpi.h>
-#include <cstdlib>
 #include "dynamical_matrix.h"
-#include "atom.h"
-#include "modify.h"
-#include "domain.h"
-#include "comm.h"
-#include "group.h"
-#include "force.h"
-#include "math_extra.h"
-#include "memory.h"
-#include "bond.h"
+
 #include "angle.h"
+#include "atom.h"
+#include "bond.h"
+#include "comm.h"
 #include "dihedral.h"
+#include "domain.h"
+#include "error.h"
+#include "finish.h"
+#include "force.h"
+#include "group.h"
 #include "improper.h"
 #include "kspace.h"
-#include "update.h"
+#include "memory.h"
+#include "modify.h"
 #include "neighbor.h"
 #include "pair.h"
 #include "timer.h"
-#include "finish.h"
-#include <algorithm>
+#include "update.h"
 
+#include <cmath>
+#include <cstring>
+#include <algorithm>
 
 using namespace LAMMPS_NS;
 enum{REGULAR,ESKM};
 
 /* ---------------------------------------------------------------------- */
 
-DynamicalMatrix::DynamicalMatrix(LAMMPS *lmp) : Pointers(lmp), fp(NULL)
+DynamicalMatrix::DynamicalMatrix(LAMMPS *lmp) : Pointers(lmp), fp(nullptr)
 {
     external_force_clear = 1;
 }
@@ -42,7 +43,7 @@ DynamicalMatrix::~DynamicalMatrix()
 {
     if (fp && me == 0) fclose(fp);
     memory->destroy(groupmap);
-    fp = NULL;
+    fp = nullptr;
 }
 
 /* ----------------------------------------------------------------------
@@ -67,11 +68,6 @@ void DynamicalMatrix::setup()
     domain->image_check();
     domain->box_too_small_check();
     neighbor->build(1);
-    neighbor->ncalls = 0;
-    neighbor->every = 2;                       // build every this many steps
-    neighbor->delay = 1;
-    neighbor->ago = 0;
-    neighbor->ndanger = 0;
 
     // compute all forces
     external_force_clear = 0;
@@ -122,7 +118,7 @@ void DynamicalMatrix::command(int narg, char **arg)
     if (strcmp(arg[1],"regular") == 0) style = REGULAR;
     else if (strcmp(arg[1],"eskm") == 0) style = ESKM;
     else error->all(FLERR,"Illegal Dynamical Matrix command");
-    del = force->numeric(FLERR, arg[2]);
+    del = utils::numeric(FLERR, arg[2],false,lmp);
 
     // set option defaults
 
@@ -138,7 +134,7 @@ void DynamicalMatrix::command(int narg, char **arg)
     else if (style == ESKM) options(narg-3,&arg[3]); //COME BACK
     else if (comm->me == 0 && screen) fprintf(screen,"Illegal Dynamical Matrix command\n");
 
-    if (atom->map_style == 0)
+    if (atom->map_style == Atom::MAP_NONE)
       error->all(FLERR,"Dynamical_matrix command requires an atom map, see atom_modify");
 
     // move atoms by 3-vector or specified variable(s)
@@ -227,7 +223,7 @@ void DynamicalMatrix::openfile(const char* filename)
         fp = fopen(filename,"w");
     }
 
-    if (fp == NULL) error->one(FLERR,"Cannot open dump file");
+    if (fp == nullptr) error->one(FLERR,"Cannot open dump file");
 
     file_opened = 1;
 }
@@ -265,7 +261,7 @@ void DynamicalMatrix::calculateMatrix()
         fprintf(screen,"  Atoms in group = " BIGINT_FORMAT "\n", gcount);
         fprintf(screen,"  Total dynamical matrix elements = " BIGINT_FORMAT "\n", (dynlen*dynlen) );
     }
-    
+
     // emit dynlen rows of dimalpha*dynlen*dimbeta elements
 
     update->nsteps = 0;
@@ -274,7 +270,7 @@ void DynamicalMatrix::calculateMatrix()
         local_idx = atom->map(i);
         if (gm[i-1] < 0)
             continue;
-        for (bigint alpha=0; alpha<3; alpha++){
+        for (int alpha=0; alpha<3; alpha++){
             displace_atom(local_idx, alpha, 1);
             update_force();
             for (bigint j=1; j<=natoms; j++){
@@ -292,7 +288,7 @@ void DynamicalMatrix::calculateMatrix()
                 local_jdx = atom->map(j);
                 if (local_idx >= 0 && local_jdx >= 0 && local_jdx < nlocal
                     && gm[j-1] >= 0){
-                    for (bigint beta=0; beta<3; beta++){
+                    for (int beta=0; beta<3; beta++){
                         if (atom->rmass_flag == 1)
                             imass = sqrt(m[local_idx] * m[local_jdx]);
                         else
@@ -391,12 +387,13 @@ void DynamicalMatrix::displace_atom(int local_idx, int direction, int magnitude)
 void DynamicalMatrix::update_force()
 {
     force_clear();
+    int n_post_force = modify->n_post_force;
 
     if (pair_compute_flag) {
         force->pair->compute(eflag,vflag);
         timer->stamp(Timer::PAIR);
     }
-    if (atom->molecular) {
+    if (atom->molecular != Atom::ATOMIC) {
         if (force->bond) force->bond->compute(eflag,vflag);
         if (force->angle) force->angle->compute(eflag,vflag);
         if (force->dihedral) force->dihedral->compute(eflag,vflag);
@@ -411,6 +408,12 @@ void DynamicalMatrix::update_force()
         comm->reverse_comm();
         timer->stamp(Timer::COMM);
     }
+
+    // force modifications
+
+    if (n_post_force) modify->post_force(vflag);
+    timer->stamp(Timer::MODIFY);
+
     ++ update->nsteps;
 }
 
@@ -454,7 +457,7 @@ void DynamicalMatrix::dynmat_clear(double **dynmat)
 void DynamicalMatrix::convert_units(const char *style)
 {
     // physical constants from:
-    // http://physics.nist.gov/cuu/Constants/Table/allascii.txt
+    // https://physics.nist.gov/cuu/Constants/Table/allascii.txt
     // using thermochemical calorie = 4.184 J
 
     if (strcmp(style,"lj") == 0) {

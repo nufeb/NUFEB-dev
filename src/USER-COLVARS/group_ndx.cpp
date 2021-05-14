@@ -2,7 +2,7 @@
 
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -17,14 +17,11 @@
 ------------------------------------------------------------------------- */
 
 #include "group_ndx.h"
+
 #include "atom.h"
 #include "comm.h"
-#include "group.h"
-#include "memory.h"
 #include "error.h"
-
-#include <cstdio>
-#include <cstdlib>
+#include "group.h"
 
 using namespace LAMMPS_NS;
 
@@ -146,7 +143,7 @@ void Group2Ndx::command(int narg, char **arg)
 
   if (comm->me == 0) {
     fp = fopen(arg[0], "w");
-    if (fp == NULL)
+    if (fp == nullptr)
       error->one(FLERR,"Cannot open index file for writing");
 
     if (screen)

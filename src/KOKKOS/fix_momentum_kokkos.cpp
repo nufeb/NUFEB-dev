@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -11,17 +11,16 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <cstdlib>
-#include <cstring>
 #include "fix_momentum_kokkos.h"
+
 #include "atom_kokkos.h"
 #include "atom_masks.h"
-#include "domain.h"
 #include "domain_kokkos.h"
 #include "group.h"
 #include "error.h"
-#include "force.h"
 #include "kokkos_few.h"
+
+#include <cstring>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -199,7 +198,7 @@ void FixMomentumKokkos<DeviceType>::end_of_step()
 
 namespace LAMMPS_NS {
 template class FixMomentumKokkos<LMPDeviceType>;
-#ifdef KOKKOS_ENABLE_CUDA
+#ifdef LMP_KOKKOS_GPU
 template class FixMomentumKokkos<LMPHostType>;
 #endif
 }

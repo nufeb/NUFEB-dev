@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -11,9 +11,9 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <cstring>
-#include <cmath>
 #include "compute_force_tally.h"
+
+#include <cmath>
 #include "atom.h"
 #include "group.h"
 #include "pair.h"
@@ -49,7 +49,7 @@ ComputeForceTally::ComputeForceTally(LAMMPS *lmp, int narg, char **arg) :
 
   did_setup = invoked_peratom = invoked_scalar = -1;
   nmax = -1;
-  fatom = NULL;
+  fatom = nullptr;
   vector = new double[size_peratom_cols];
 }
 
@@ -66,7 +66,7 @@ ComputeForceTally::~ComputeForceTally()
 
 void ComputeForceTally::init()
 {
-  if (force->pair == NULL)
+  if (force->pair == nullptr)
     error->all(FLERR,"Trying to use compute force/tally without pair style");
   else
     force->pair->add_tally_callback(this);

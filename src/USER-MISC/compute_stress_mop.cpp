@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -15,18 +15,14 @@
   Contributing Authors : Romain Vermorel (LFCR), Laurent Joly (ULyon)
   --------------------------------------------------------------------------*/
 
-#include <mpi.h>
+#include "compute_stress_mop.h"
+
 #include <cmath>
 #include <cstring>
-#include <cstdlib>
 
-#include "compute_stress_mop.h"
 #include "atom.h"
 #include "update.h"
 #include "domain.h"
-#include "group.h"
-#include "modify.h"
-#include "fix.h"
 #include "neighbor.h"
 #include "force.h"
 #include "pair.h"
@@ -69,7 +65,7 @@ ComputeStressMop::ComputeStressMop(LAMMPS *lmp, int narg, char **arg) :
     pos = domain->boxhi[dir];
   } else if (strcmp(arg[4],"center")==0) {
     pos = 0.5*(domain->boxlo[dir]+domain->boxhi[dir]);
-  } else pos = force->numeric(FLERR,arg[4]);
+  } else pos = utils::numeric(FLERR,arg[4],false,lmp);
 
   if ( pos < (domain->boxlo[dir]+domain->prd_half[dir]) ) {
     pos1 = pos + domain->prd[dir];
@@ -121,7 +117,7 @@ ComputeStressMop::ComputeStressMop(LAMMPS *lmp, int narg, char **arg) :
 
   // Initialize some variables
 
-  values_local = values_global = vector = NULL;
+  values_local = values_global = vector = nullptr;
 
   // this fix produces a global vector
 
@@ -177,7 +173,7 @@ void ComputeStressMop::init()
 
   // This compute requires a pair style with pair_single method implemented
 
-  if (force->pair == NULL)
+  if (force->pair == nullptr)
     error->all(FLERR,"No pair style is defined for compute stress/mop");
   if (force->pair->single_enable == 0)
     error->all(FLERR,"Pair style does not support compute stress/mop");
@@ -189,15 +185,15 @@ void ComputeStressMop::init()
     //Compute stress/mop only accounts for pair interactions.
     // issue a warning if any intramolecular potential or Kspace is defined.
 
-    if (force->bond!=NULL)
+    if (force->bond!=nullptr)
       error->warning(FLERR,"compute stress/mop does not account for bond potentials");
-    if (force->angle!=NULL)
+    if (force->angle!=nullptr)
       error->warning(FLERR,"compute stress/mop does not account for angle potentials");
-    if (force->dihedral!=NULL)
+    if (force->dihedral!=nullptr)
       error->warning(FLERR,"compute stress/mop does not account for dihedral potentials");
-    if (force->improper!=NULL)
+    if (force->improper!=nullptr)
       error->warning(FLERR,"compute stress/mop does not account for improper potentials");
-    if (force->kspace!=NULL)
+    if (force->kspace!=nullptr)
       error->warning(FLERR,"compute stress/mop does not account for kspace contributions");
   }
 
@@ -322,7 +318,7 @@ void ComputeStressMop::compute_pairs()
 
           if (newton_pair || j < nlocal) {
 
-            //check if ij pair is accross plane, add contribution to pressure
+            //check if ij pair is across plane, add contribution to pressure
             if ( ((xi[dir]>pos) && (xj[dir]<pos)) || ((xi[dir]>pos1) && (xj[dir]<pos1)) ) {
 
               pair->single(i,j,itype,jtype,rsq,factor_coul,factor_lj,fpair);

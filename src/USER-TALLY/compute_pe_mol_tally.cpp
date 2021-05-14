@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -11,13 +11,12 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <cstring>
 #include "compute_pe_mol_tally.h"
+
 #include "atom.h"
 #include "group.h"
 #include "pair.h"
 #include "update.h"
-#include "memory.h"
 #include "error.h"
 #include "force.h"
 #include "comm.h"
@@ -60,7 +59,7 @@ ComputePEMolTally::~ComputePEMolTally()
 
 void ComputePEMolTally::init()
 {
-  if (force->pair == NULL)
+  if (force->pair == nullptr)
     error->all(FLERR,"Trying to use compute pe/mol/tally without pair style");
   else
     force->pair->add_tally_callback(this);

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -16,24 +16,22 @@
    Based on fix_rigid (version from 2008).
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include "fix_lb_rigid_pc_sphere.h"
+
+#include <cmath>
+
+#include <cstring>
 #include "atom.h"
-#include "atom_vec.h"
 #include "domain.h"
 #include "update.h"
-#include "respa.h"
 #include "modify.h"
 #include "group.h"
 #include "comm.h"
 #include "force.h"
-#include "output.h"
 #include "memory.h"
 #include "error.h"
 #include "fix_lb_fluid.h"
+
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -56,10 +54,10 @@ FixLbRigidPCSphere::FixLbRigidPCSphere(LAMMPS *lmp, int narg, char **arg) :
   // perform initial allocation of atom-based arrays
   // register with Atom class
 
-  body = NULL;
-  up = NULL;
+  body = nullptr;
+  up = nullptr;
   grow_arrays(atom->nmax);
-  atom->add_callback(0);
+  atom->add_callback(Atom::GROW);
 
   // by default assume all of the particles interact with the fluid.
   inner_nodes = 0;
@@ -95,7 +93,7 @@ FixLbRigidPCSphere::FixLbRigidPCSphere(LAMMPS *lmp, int narg, char **arg) :
 
   } else if (strcmp(arg[3],"molecule") == 0) {
     iarg = 4;
-    if (atom->molecular == 0)
+    if (atom->molecular == Atom::ATOMIC)
       error->all(FLERR,"Must use a molecular atom style with "
                  "fix lb/rigid/pc/sphere molecule");
 
@@ -236,7 +234,7 @@ FixLbRigidPCSphere::FixLbRigidPCSphere(LAMMPS *lmp, int narg, char **arg) :
       if (iarg+5 > narg) error->all(FLERR,"Illegal fix lb/rigid/pc/sphere command");
 
       int mlo,mhi;
-      force->bounds(FLERR,arg[iarg+1],nbody,mlo,mhi);
+      utils::bounds(FLERR,arg[iarg+1],1,nbody,mlo,mhi,error);
 
       double xflag,yflag,zflag;
       if (strcmp(arg[iarg+2],"off") == 0) xflag = 0.0;
@@ -263,7 +261,7 @@ FixLbRigidPCSphere::FixLbRigidPCSphere(LAMMPS *lmp, int narg, char **arg) :
       if (iarg+5 > narg) error->all(FLERR,"Illegal fix lb/rigid/pc/sphere command");
 
       int mlo,mhi;
-      force->bounds(FLERR,arg[iarg+1],nbody,mlo,mhi);
+      utils::bounds(FLERR,arg[iarg+1],1,nbody,mlo,mhi,error);
 
       double xflag,yflag,zflag;
       if (strcmp(arg[iarg+2],"off") == 0) xflag = 0.0;
@@ -402,7 +400,7 @@ FixLbRigidPCSphere::~FixLbRigidPCSphere()
 {
   // unregister callbacks to this fix from Atom class
 
-  atom->delete_callback(id,0);
+  atom->delete_callback(id,Atom::GROW);
 
   // delete locally stored arrays
 

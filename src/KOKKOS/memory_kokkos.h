@@ -14,7 +14,7 @@
 #ifndef LMP_MEMORY_KOKKOS_H
 #define LMP_MEMORY_KOKKOS_H
 
-#include "memory.h"
+#include "memory.h"             // IWYU pragma: export
 #include "kokkos_type.h"
 
 namespace LAMMPS_NS {
@@ -78,7 +78,7 @@ template <typename TYPE>
 TYPE grow_kokkos(TYPE &data, typename TYPE::value_type *&array,
                  int n1, const char *name)
 {
-  if (array == NULL) return create_kokkos(data,array,n1,name);
+  if (array == nullptr) return create_kokkos(data,array,n1,name);
 
   data.resize(n1);
   array = data.h_view.data();
@@ -88,9 +88,9 @@ TYPE grow_kokkos(TYPE &data, typename TYPE::value_type *&array,
 template <typename TYPE>
 void destroy_kokkos(TYPE data, typename TYPE::value_type* &array)
 {
-  if (array == NULL) return;
+  if (array == nullptr) return;
   data = TYPE();
-  array = NULL;
+  array = nullptr;
 }
 
 /* ----------------------------------------------------------------------
@@ -100,7 +100,7 @@ void destroy_kokkos(TYPE data, typename TYPE::value_type* &array)
 template <typename TYPE>
 TYPE destroy_kokkos(TYPE &data)
 {
-  /*if(data.data()!=NULL)
+  /*if(data.data()!=nullptr)
     free(data.data());*/
   data = TYPE();
   return data;
@@ -184,7 +184,7 @@ TYPE create_kokkos(TYPE &data, typename TYPE::value_type **&array,
   bigint n = 0;
   for (int i = 0; i < n1; i++) {
     if(n2==0)
-      array[i] = NULL;
+      array[i] = nullptr;
     else
       array[i] = &data.h_view(i,0);
     n += n2;
@@ -209,7 +209,7 @@ template <typename TYPE, typename HTYPE>
   bigint n = 0;
   for (int i = 0; i < n1; i++) {
     if(n2==0)
-      array[i] = NULL;
+      array[i] = nullptr;
     else
       array[i] = &h_data(i,0);
     n += n2;
@@ -226,14 +226,14 @@ template <typename TYPE>
 TYPE grow_kokkos(TYPE &data, typename TYPE::value_type **&array,
                  int n1, int n2, const char *name)
 {
-  if (array == NULL) return create_kokkos(data,array,n1,n2,name);
+  if (array == nullptr) return create_kokkos(data,array,n1,n2,name);
   data.resize(n1,n2);
   bigint nbytes = ((bigint) sizeof(typename TYPE::value_type *)) * n1;
   array = (typename TYPE::value_type**) srealloc(array,nbytes,name);
 
   for (int i = 0; i < n1; i++)
     if(n2==0)
-      array[i] = NULL;
+      array[i] = nullptr;
     else
       array[i] = &data.h_view(i,0);
 
@@ -250,7 +250,7 @@ TYPE create_kokkos(TYPE &data, typename TYPE::value_type **&array,
 
   for (int i = 0; i < n1; i++)
     if(data.h_view.extent(1)==0)
-      array[i] = NULL;
+      array[i] = nullptr;
     else
       array[i] = &data.h_view(i,0);
 
@@ -261,7 +261,7 @@ template <typename TYPE>
 TYPE grow_kokkos(TYPE &data, typename TYPE::value_type **&array,
                  int n1, const char *name)
 {
-  if (array == NULL) return create_kokkos(data,array,n1,name);
+  if (array == nullptr) return create_kokkos(data,array,n1,name);
 
   data.resize(n1);
 
@@ -270,7 +270,7 @@ TYPE grow_kokkos(TYPE &data, typename TYPE::value_type **&array,
 
   for (int i = 0; i < n1; i++)
     if(data.h_view.extent(1)==0)
-      array[i] = NULL;
+      array[i] = nullptr;
     else
       array[i] = &data.h_view(i,0);
 
@@ -284,10 +284,10 @@ TYPE grow_kokkos(TYPE &data, typename TYPE::value_type **&array,
 template <typename TYPE>
 void destroy_kokkos(TYPE data, typename TYPE::value_type** &array)
 {
-  if (array == NULL) return;
+  if (array == nullptr) return;
   data = TYPE();
   sfree(array);
-  array = NULL;
+  array = nullptr;
 }
 
 /* ----------------------------------------------------------------------

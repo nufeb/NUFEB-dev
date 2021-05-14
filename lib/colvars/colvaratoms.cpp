@@ -2,7 +2,7 @@
 
 // This file is part of the Collective Variables module (Colvars).
 // The original version of Colvars and its updates are located at:
-// https://github.com/colvars/colvars
+// https://github.com/Colvars/colvars
 // Please update all Colvars source files before making any changes.
 // If you wish to distribute your changes, please submit them to the
 // Colvars repository at GitHub.
@@ -178,6 +178,31 @@ int cvm::atom_group::remove_atom(cvm::atom_iter ai)
 }
 
 
+int cvm::atom_group::set_dummy()
+{
+  if (atoms_ids.size() > 0) {
+    return cvm::error("Error: setting group with keyword \""+key+
+                      "\" and name \""+name+"\" as dummy, but it already "
+                      "contains atoms.\n", INPUT_ERROR);
+  }
+  b_dummy = true;
+  return COLVARS_OK;
+}
+
+
+int cvm::atom_group::set_dummy_pos(cvm::atom_pos const &pos)
+{
+  if (b_dummy) {
+    dummy_atom_pos = pos;
+  } else {
+    return cvm::error("Error: setting dummy position for group with keyword \""+
+                      key+"\" and name \""+name+
+                      "\", but it is not dummy.\n", INPUT_ERROR);
+  }
+  return COLVARS_OK;
+}
+
+
 int cvm::atom_group::init()
 {
   if (!key.size()) key = "unnamed";
@@ -215,19 +240,19 @@ int cvm::atom_group::init_dependencies() {
     }
 
     init_feature(f_ag_active, "active", f_type_dynamic);
-    init_feature(f_ag_center, "translational fit", f_type_static);
-    init_feature(f_ag_rotate, "rotational fit", f_type_static);
-    init_feature(f_ag_fitting_group, "fitting group", f_type_static);
-    init_feature(f_ag_explicit_gradient, "explicit atom gradient", f_type_dynamic);
-    init_feature(f_ag_fit_gradients, "fit gradients", f_type_user);
+    init_feature(f_ag_center, "translational_fit", f_type_static);
+    init_feature(f_ag_rotate, "rotational_fit", f_type_static);
+    init_feature(f_ag_fitting_group, "fitting_group", f_type_static);
+    init_feature(f_ag_explicit_gradient, "explicit_atom_gradient", f_type_dynamic);
+    init_feature(f_ag_fit_gradients, "fit_gradients", f_type_user);
     require_feature_self(f_ag_fit_gradients, f_ag_explicit_gradient);
 
-    init_feature(f_ag_atom_forces, "atomic forces", f_type_dynamic);
+    init_feature(f_ag_atom_forces, "atomic_forces", f_type_dynamic);
 
     // parallel calculation implies that we have at least a scalable center of mass,
     // but f_ag_scalable is kept as a separate feature to deal with future dependencies
-    init_feature(f_ag_scalable, "scalable group calculation", f_type_static);
-    init_feature(f_ag_scalable_com, "scalable group center of mass calculation", f_type_static);
+    init_feature(f_ag_scalable, "scalable_group", f_type_static);
+    init_feature(f_ag_scalable_com, "scalable_group_center_of_mass", f_type_static);
     require_feature_self(f_ag_scalable, f_ag_scalable_com);
 
     // check that everything is initialized
@@ -469,20 +494,15 @@ int cvm::atom_group::parse(std::string const &group_conf)
   // checks of doubly-counted atoms have been handled by add_atom() already
 
   if (get_keyval(group_conf, "dummyAtom", dummy_atom_pos, cvm::atom_pos())) {
-    b_dummy = true;
-    // note: atoms_ids.size() is used here in lieu of atoms.size(),
-    // which can be empty for scalable groups
-    if (atoms_ids.size()) {
-      cvm::error("Error: cannot set up group \""+
-                 key+"\" as a dummy atom "
-                 "and provide it with atom definitions.\n", INPUT_ERROR);
-    }
+
+    parse_error |= set_dummy();
+    parse_error |= set_dummy_pos(dummy_atom_pos);
+
   } else {
-    b_dummy = false;
 
     if (!(atoms_ids.size())) {
-      cvm::error("Error: no atoms defined for atom group \""+
-                 key+"\".\n", INPUT_ERROR);
+      parse_error |= cvm::error("Error: no atoms defined for atom group \""+
+                                key+"\".\n", INPUT_ERROR);
     }
 
     // whether these atoms will ever receive forces or not
@@ -608,39 +628,42 @@ int cvm::atom_group::add_atom_numbers(std::string const &numbers_conf)
 
 int cvm::atom_group::add_index_group(std::string const &index_group_name)
 {
-  colvarmodule *cv = cvm::main();
+  std::vector<std::string> const &index_group_names =
+    cvm::main()->index_group_names;
+  std::vector<std::vector<int> *> const &index_groups =
+    cvm::main()->index_groups;
 
-  std::list<std::string>::iterator names_i = cv->index_group_names.begin();
-  std::list<std::vector<int> >::iterator index_groups_i = cv->index_groups.begin();
-  for ( ; names_i != cv->index_group_names.end() ; ++names_i, ++index_groups_i) {
-    if (*names_i == index_group_name)
+  size_t i_group = 0;
+  for ( ; i_group < index_groups.size(); i_group++) {
+    if (index_group_names[i_group] == index_group_name)
       break;
   }
 
-  if (names_i == cv->index_group_names.end()) {
-    cvm::error("Error: could not find index group "+
-               index_group_name+" among those provided by the index file.\n",
-               INPUT_ERROR);
-    return COLVARS_ERROR;
+  if (i_group >= index_group_names.size()) {
+    return cvm::error("Error: could not find index group "+
+                      index_group_name+" among those already provided.\n",
+                      INPUT_ERROR);
   }
 
-  atoms_ids.reserve(atoms_ids.size()+index_groups_i->size());
+  int error_code = COLVARS_OK;
+
+  std::vector<int> const &index_group = *(index_groups[i_group]);
+
+  atoms_ids.reserve(atoms_ids.size()+index_group.size());
 
   if (is_enabled(f_ag_scalable)) {
-    for (size_t i = 0; i < index_groups_i->size(); i++) {
-      add_atom_id((cvm::proxy)->check_atom_id((*index_groups_i)[i]));
+    for (size_t i = 0; i < index_group.size(); i++) {
+      error_code |=
+        add_atom_id((cvm::proxy)->check_atom_id(index_group[i]));
     }
   } else {
-    atoms.reserve(atoms.size()+index_groups_i->size());
-    for (size_t i = 0; i < index_groups_i->size(); i++) {
-      add_atom(cvm::atom((*index_groups_i)[i]));
+    atoms.reserve(atoms.size()+index_group.size());
+    for (size_t i = 0; i < index_group.size(); i++) {
+      error_code |= add_atom(cvm::atom(index_group[i]));
     }
   }
 
-  if (cvm::get_error())
-    return COLVARS_ERROR;
-
-  return COLVARS_OK;
+  return error_code;
 }
 
 

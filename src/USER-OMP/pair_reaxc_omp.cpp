@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -34,6 +34,8 @@
  ------------------------------------------------------------------------- */
 
 #include "pair_reaxc_omp.h"
+
+#include <cmath>
 #include "atom.h"
 #include "update.h"
 #include "force.h"
@@ -42,32 +44,27 @@
 #include "neigh_list.h"
 #include "neigh_request.h"
 #include "modify.h"
-#include "fix.h"
 #include "fix_reaxc.h"
 #include "citeme.h"
 #include "memory.h"
 #include "error.h"
-#include "timer.h"
 
+
+#include "reaxc_defs.h"
 #include "reaxc_types.h"
 #include "reaxc_allocate.h"
-#include "reaxc_control.h"
-#include "reaxc_ffield.h"
 #include "reaxc_forces_omp.h"
 #include "reaxc_init_md_omp.h"
 #include "reaxc_io_tools.h"
 #include "reaxc_list.h"
-#include "reaxc_lookup.h"
 #include "reaxc_reset_tools.h"
 #include "reaxc_tool_box.h"
-#include "reaxc_traj.h"
-#include "reaxc_vector.h"
-#include "fix_reaxc_bonds.h"
 
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
 
+#include "suffix.h"
 using namespace LAMMPS_NS;
 
 #ifdef OMP_TIMING
@@ -95,7 +92,7 @@ PairReaxCOMP::PairReaxCOMP(LAMMPS *lmp) : PairReaxC(lmp), ThrOMP(lmp, THR_PAIR)
   system->pair_ptr = this;
   system->omp_active = 1;
 
-  num_nbrs_offset = NULL;
+  num_nbrs_offset = nullptr;
 
 #ifdef OMP_TIMING
   for (int i=0;i<LASTTIMINGINDEX;i++) {
@@ -288,14 +285,13 @@ void PairReaxCOMP::compute(int eflag, int vflag)
 
   if (vflag_fdotr) virial_fdotr_compute();
 
-// Set internal timestep counter to that of LAMMPS
+  // Set internal timestep counter to that of LAMMPS
 
   data->step = update->ntimestep;
 
   Output_Results( system, control, data, &lists, out_control, mpi_data );
 
   // populate tmpid and tmpbo arrays for fix reax/c/species
-  int i, j;
 
   if(fixspecies_flag) {
     if (system->N > nmax) {
@@ -309,8 +305,8 @@ void PairReaxCOMP::compute(int eflag, int vflag)
 #if defined(_OPENMP)
 #pragma omp parallel for collapse(2) schedule(static) default(shared)
 #endif
-    for (i = 0; i < system->N; i ++)
-      for (j = 0; j < MAXSPECBOND; j ++) {
+    for (int i = 0; i < system->N; i++)
+      for (int j = 0; j < MAXSPECBOND; j++) {
         tmpbo[i][j] = 0.0;
         tmpid[i][j] = 0;
       }
@@ -328,9 +324,10 @@ void PairReaxCOMP::init_style( )
 
   // firstwarn = 1;
 
-  int iqeq = modify->find_fix_by_style("qeq/reax/omp");
-  if (iqeq < 0 && qeqflag == 1)
-    error->all(FLERR,"Pair reax/c/omp requires use of fix qeq/reax/omp");
+  bool have_qeq = ((modify->find_fix_by_style("^qeq/reax") != -1)
+                   || (modify->find_fix_by_style("^qeq/shielded") != -1));
+  if (!have_qeq && qeqflag == 1)
+    error->all(FLERR,"Pair reax/c requires use of fix qeq/reax or qeq/shielded");
 
   system->n = atom->nlocal; // my atoms
   system->N = atom->nlocal + atom->nghost; // mine + ghosts
@@ -371,7 +368,7 @@ void PairReaxCOMP::init_style( )
   for( int i = 0; i < LIST_N; ++i )
     lists[i].allocated = 0;
 
-  if (fix_reax == NULL) {
+  if (fix_reax == nullptr) {
     char **fixarg = new char*[3];
     fixarg[0] = (char *) fix_id;
     fixarg[1] = (char *) "all";
@@ -511,7 +508,7 @@ int PairReaxCOMP::estimate_reax_lists()
     num_nbrs += numneigh[i];
   }
 
-  int new_estimate = MAX (num_nbrs, mincap*MIN_NBRS);
+  int new_estimate = MAX(num_nbrs, mincap*REAX_MIN_NBRS);
 
   return new_estimate;
 }
@@ -615,13 +612,11 @@ void PairReaxCOMP::read_reax_forces(int /* vflag */)
 void PairReaxCOMP::FindBond()
 {
   const double bo_cut = 0.10;
-  int i;
 
 #if defined(_OPENMP)
-#pragma omp parallel for schedule(static) default(shared)   \
-  private(i)
+#pragma omp parallel for schedule(static) default(shared)
 #endif
-  for (i = 0; i < system->n; i++) {
+  for (int i = 0; i < system->n; i++) {
     int j, pj, nj;
     double bo_tmp;
     bond_data *bo_ij;

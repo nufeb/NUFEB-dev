@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -16,19 +16,17 @@
    [ based on improper_umbrella.cpp Tod A Pascal (Caltech) ]
 ------------------------------------------------------------------------- */
 
-#include <mpi.h>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
 #include "improper_fourier.h"
+
+#include <cmath>
 #include "atom.h"
 #include "comm.h"
 #include "neighbor.h"
-#include "domain.h"
 #include "force.h"
 #include "update.h"
 #include "memory.h"
 #include "error.h"
+
 
 using namespace LAMMPS_NS;
 
@@ -281,14 +279,14 @@ void ImproperFourier::coeff(int narg, char **arg)
   if (!allocated) allocate();
 
   int ilo,ihi;
-  force->bounds(FLERR,arg[0],atom->nimpropertypes,ilo,ihi);
+  utils::bounds(FLERR,arg[0],1,atom->nimpropertypes,ilo,ihi,error);
 
-  double k_one = force->numeric(FLERR,arg[1]);
-  double C0_one = force->numeric(FLERR,arg[2]);
-  double C1_one = force->numeric(FLERR,arg[3]);
-  double C2_one = force->numeric(FLERR,arg[4]);
+  double k_one = utils::numeric(FLERR,arg[1],false,lmp);
+  double C0_one = utils::numeric(FLERR,arg[2],false,lmp);
+  double C1_one = utils::numeric(FLERR,arg[3],false,lmp);
+  double C2_one = utils::numeric(FLERR,arg[4],false,lmp);
   int all_one = 1;
-  if ( narg == 6 ) all_one = force->inumeric(FLERR,arg[5]);
+  if ( narg == 6 ) all_one = utils::inumeric(FLERR,arg[5],false,lmp);
 
   // convert w0 from degrees to radians
 
@@ -328,11 +326,11 @@ void ImproperFourier::read_restart(FILE *fp)
   allocate();
 
   if (comm->me == 0) {
-    fread(&k[1],sizeof(double),atom->nimpropertypes,fp);
-    fread(&C0[1],sizeof(double),atom->nimpropertypes,fp);
-    fread(&C1[1],sizeof(double),atom->nimpropertypes,fp);
-    fread(&C2[1],sizeof(double),atom->nimpropertypes,fp);
-    fread(&all[1],sizeof(int),atom->nimpropertypes,fp);
+    utils::sfread(FLERR,&k[1],sizeof(double),atom->nimpropertypes,fp,nullptr,error);
+    utils::sfread(FLERR,&C0[1],sizeof(double),atom->nimpropertypes,fp,nullptr,error);
+    utils::sfread(FLERR,&C1[1],sizeof(double),atom->nimpropertypes,fp,nullptr,error);
+    utils::sfread(FLERR,&C2[1],sizeof(double),atom->nimpropertypes,fp,nullptr,error);
+    utils::sfread(FLERR,&all[1],sizeof(int),atom->nimpropertypes,fp,nullptr,error);
   }
   MPI_Bcast(&k[1],atom->nimpropertypes,MPI_DOUBLE,0,world);
   MPI_Bcast(&C0[1],atom->nimpropertypes,MPI_DOUBLE,0,world);

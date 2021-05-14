@@ -1,6 +1,6 @@
 /* -*- c++ -*- ----------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -15,11 +15,11 @@
    Contributing authors: Stefan Paquay & Matthew Peterson (Brandeis University)
 ------------------------------------------------------------------------- */
 
+#include "fix_enforce2d_kokkos.h"
 #include "atom_masks.h"
 #include "atom_kokkos.h"
 #include "comm.h"
 #include "error.h"
-#include "fix_enforce2d_kokkos.h"
 
 
 using namespace LAMMPS_NS;
@@ -34,10 +34,10 @@ FixEnforce2DKokkos<DeviceType>::FixEnforce2DKokkos(LAMMPS *lmp, int narg, char *
   execution_space = ExecutionSpaceFromDevice<DeviceType>::space;
 
   datamask_read   = V_MASK | F_MASK | OMEGA_MASK | MASK_MASK
-	  | TORQUE_MASK | ANGMOM_MASK;
+          | TORQUE_MASK | ANGMOM_MASK;
 
   datamask_modify = V_MASK | F_MASK | OMEGA_MASK
-	  | TORQUE_MASK | ANGMOM_MASK;
+          | TORQUE_MASK | ANGMOM_MASK;
 }
 
 
@@ -49,7 +49,7 @@ void FixEnforce2DKokkos<DeviceType>::setup(int vflag)
 
 
 template <class DeviceType>
-void FixEnforce2DKokkos<DeviceType>::post_force(int vflag)
+void FixEnforce2DKokkos<DeviceType>::post_force(int /*vflag*/)
 {
   atomKK->sync(execution_space,datamask_read);
 
@@ -136,6 +136,7 @@ void FixEnforce2DKokkos<DeviceType>::post_force(int vflag)
 
 template <class DeviceType>
 template <int omega_flag, int angmom_flag, int torque_flag>
+KOKKOS_INLINE_FUNCTION
 void FixEnforce2DKokkos<DeviceType>::post_force_item( int i ) const
 {
   if (mask[i] & groupbit){
@@ -162,7 +163,7 @@ void FixEnforce2DKokkos<DeviceType>::post_force_item( int i ) const
 
 namespace LAMMPS_NS {
 template class FixEnforce2DKokkos<LMPDeviceType>;
-#ifdef KOKKOS_ENABLE_CUDA
+#ifdef LMP_KOKKOS_GPU
 template class FixEnforce2DKokkos<LMPHostType>;
 #endif
 }

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -16,10 +16,10 @@
                          Aidan Thompson (Sandia, athomps@sandia.gov)
 ------------------------------------------------------------------------- */
 
-#include <mpi.h>
+
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
+
 #include <cstring>
 #include "pair_quip.h"
 #include "atom.h"
@@ -45,10 +45,10 @@ PairQUIP::PairQUIP(LAMMPS *lmp) : Pair(lmp)
   no_virial_fdotr_compute = 1;
   manybody_flag = 1;
 
-  map = NULL;
-  quip_potential = NULL;
-  quip_file = NULL;
-  quip_string = NULL;
+  map = nullptr;
+  quip_potential = nullptr;
+  quip_file = nullptr;
+  quip_string = nullptr;
 }
 
 PairQUIP::~PairQUIP()
@@ -275,7 +275,7 @@ void PairQUIP::coeff(int narg, char **arg)
     if (strcmp(arg[i],"NULL") == 0)
       map[i-3] = -1;
     else
-      map[i-3] = force->inumeric(FLERR,arg[i]);
+      map[i-3] = utils::inumeric(FLERR,arg[i],false,lmp);
   }
 
   // clear setflag since coeff() called once with I,J = * *
@@ -298,8 +298,8 @@ void PairQUIP::coeff(int narg, char **arg)
   if (count == 0) error->all(FLERR,"Incorrect args for pair coefficients");
 
   // Initialise potential
-  // First call initialises potential via the fortran code in memory, and returns the necessary size
-  // of quip_potential. This behaviour is invoked by setting n_potential_quip to 0.
+  // First call initializes potential via the fortran code in memory, and returns the necessary size
+  // of quip_potential. This behavior is invoked by setting n_potential_quip to 0.
   n_quip_potential = 0;
   quip_potential = new int[0];
   quip_lammps_potential_initialise(quip_potential,&n_quip_potential,&cutoff,quip_file,&n_quip_file,quip_string,&n_quip_string);

@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -11,20 +11,15 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
-#include <cctype>
 #include "pair_hybrid_kokkos.h"
+#include <cstring>
 #include "atom_kokkos.h"
 #include "force.h"
 #include "pair.h"
 #include "neighbor.h"
 #include "neigh_request.h"
 #include "update.h"
-#include "comm.h"
 #include "memory_kokkos.h"
-#include "error.h"
 #include "respa.h"
 #include "atom_masks.h"
 #include "kokkos.h"
@@ -92,7 +87,7 @@ void PairHybridKokkos::compute(int eflag, int vflag)
 
   // check if we are running with r-RESPA using the hybrid keyword
 
-  Respa *respa = NULL;
+  Respa *respa = nullptr;
   respaflag = 0;
   if (strstr(update->integrate_style,"respa")) {
     respa = (Respa *) update->integrate;

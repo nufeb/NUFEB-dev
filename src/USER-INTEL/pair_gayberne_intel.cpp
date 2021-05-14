@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    This software is distributed under the GNU General Public License.
@@ -555,10 +555,10 @@ void PairGayBerneIntel::eval(const int offload, const int vflag,
           dchi_2 = temp2 * (iota_2 - temp1 * r12hat_2);
 
           temp1 = -eta * u_r;
-          temp2 = eta * chi;
-          fforce_0 = temp1 * dchi_0 - temp2 * dUr_0;
-          fforce_1 = temp1 * dchi_1 - temp2 * dUr_1;
-          fforce_2 = temp1 * dchi_2 - temp2 * dUr_2;
+          temp3 = eta * chi;
+          fforce_0 = temp1 * dchi_0 - temp3 * dUr_0;
+          fforce_1 = temp1 * dchi_1 - temp3 * dUr_1;
+          fforce_2 = temp1 * dchi_2 - temp3 * dUr_2;
 
           // torque for particle 1 and 2
           // compute dUr
@@ -579,18 +579,17 @@ void PairGayBerneIntel::eval(const int offload, const int vflag,
 
           ME_vecmat(iota, b1, tempv);
           ME_cross3(tempv, iota, dchi);
-          temp1 = (flt_t)-4.0 / rsq_form[jj];
-          dchi_0 *= temp1;
-          dchi_1 *= temp1;
-          dchi_2 *= temp1;
+          dchi_0 *= temp2;
+          dchi_1 *= temp2;
+          dchi_2 *= temp2;
           flt_t dchi2_0, dchi2_1, dchi2_2;
 
           if (NEWTON_PAIR) {
             ME_vecmat(iota, b2, tempv);
             ME_cross3(tempv, iota, dchi2);
-            dchi2_0 *= temp1;
-            dchi2_1 *= temp1;
-            dchi2_2 *= temp1;
+            dchi2_0 *= temp2;
+            dchi2_1 *= temp2;
+            dchi2_2 *= temp2;
           }
 
           // compute d_eta
@@ -959,7 +958,7 @@ void PairGayBerneIntel::pack_force_const(ForceConst<flt_t> &fc,
   FC_PACKED2_T *olj34 = fc.lj34[0];
   FC_PACKED3_T *oic = fc.ic;
   int tp1sq = tp1 * tp1;
-  if (oijc != NULL && oic != NULL) {
+  if (oijc != nullptr && oic != nullptr) {
     #pragma offload_transfer target(mic:_cop) \
       in(special_lj: length(4) alloc_if(0) free_if(0)) \
       in(oijc,olj34: length(tp1sq) alloc_if(0) free_if(0)) \
@@ -991,9 +990,9 @@ void PairGayBerneIntel::ForceConst<flt_t>::set_ntypes(const int ntypes,
       int * ojtype_form = jtype_form[0];
       int * ojlist_form = jlist_form[0];
 
-      if (ospecial_lj != NULL && oijc != NULL && olj34 != NULL &&
-          orsq_form != NULL && odelx_form != NULL && odely_form != NULL &&
-          odelz_form != NULL && ojtype_form != NULL && ojlist_form != NULL &&
+      if (ospecial_lj != nullptr && oijc != nullptr && olj34 != nullptr &&
+          orsq_form != nullptr && odelx_form != nullptr && odely_form != nullptr &&
+          odelz_form != nullptr && ojtype_form != nullptr && ojlist_form != nullptr &&
           _cop >= 0) {
         #pragma offload_transfer target(mic:_cop) \
           nocopy(ospecial_lj, oijc, olj34, oic: alloc_if(0) free_if(1)) \
@@ -1049,10 +1048,10 @@ void PairGayBerneIntel::ForceConst<flt_t>::set_ntypes(const int ntypes,
       int off_onel = one_length * nthreads;
 
       int tp1sq = ntypes*ntypes;
-      if (ospecial_lj != NULL && oijc != NULL && olj34 != NULL &&
-          oic != NULL && orsq_form != NULL && odelx_form != NULL &&
-          odely_form != NULL && odelz_form != NULL && ojtype_form !=NULL &&
-          ojlist_form !=NULL && cop >= 0) {
+      if (ospecial_lj != nullptr && oijc != nullptr && olj34 != nullptr &&
+          oic != nullptr && orsq_form != nullptr && odelx_form != nullptr &&
+          odely_form != nullptr && odelz_form != nullptr && ojtype_form !=nullptr &&
+          ojlist_form !=nullptr && cop >= 0) {
         #pragma offload_transfer target(mic:cop) \
           nocopy(ospecial_lj: length(4) alloc_if(1) free_if(0)) \
           nocopy(oijc,olj34: length(tp1sq) alloc_if(1) free_if(0)) \

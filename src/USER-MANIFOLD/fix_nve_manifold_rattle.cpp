@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    Lammps - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -21,7 +21,7 @@
    This file is part of the user-manifold package written by
    Stefan Paquay at the Eindhoven University of Technology.
    This module makes it possible to do MD with particles constrained
-   to pretty arbitrary manifolds characterised by some constraint function
+   to pretty arbitrary manifolds characterized by some constraint function
    g(x,y,z) = 0 and its normal grad(g). The number of manifolds available
    right now is limited but can be extended straightforwardly by making
    a new class that inherits from manifold and implements all pure virtual
@@ -32,24 +32,18 @@
 ------------------------------------------------------------------------- */
 
 
-#include <cstdio>
-#include <cstdlib>
+#include "fix_nve_manifold_rattle.h"
+
 #include <cstring>
 #include "atom.h"
 #include "force.h"
 #include "update.h"
-#include "respa.h"
 #include "error.h"
-#include "group.h"
-#include <cmath>
 #include "input.h"
 #include "variable.h"
 #include "citeme.h"
-#include "memory.h"
 #include "comm.h"
 
-
-#include "fix_nve_manifold_rattle.h"
 #include "manifold_factory.h"
 #include "manifold.h"
 
@@ -97,8 +91,8 @@ FixNVEManifoldRattle::FixNVEManifoldRattle( LAMMPS *lmp, int &narg, char **arg,
   next_output = 0;
   dtv = dtf = 0;
 
-  tolerance = force->numeric( FLERR, arg[3] );
-  max_iter  = force->numeric( FLERR, arg[4] );
+  tolerance = utils::numeric( FLERR, arg[3] ,false,lmp);
+  max_iter  = utils::numeric( FLERR, arg[4] ,false,lmp);
 
   ptr_m = create_manifold(arg[5], lmp, narg, arg);
   if (!ptr_m) {
@@ -130,12 +124,12 @@ FixNVEManifoldRattle::FixNVEManifoldRattle( LAMMPS *lmp, int &narg, char **arg,
       is_var[i] = 1;
       offset = 2;
     } else {
-      force->numeric(FLERR,arg[i+6]); // Check if legal number.
+      utils::numeric(FLERR,arg[i+6],false,lmp); // Check if legal number.
       len = strlen( arg[i+6] ) + 1; // +1 for \0.
       is_var[i] = 0;
     }
     tstrs[i] = new char[len];
-    if (tstrs[i] == NULL ) error->all(FLERR,"Error allocating space for args.");
+    if (tstrs[i] == nullptr ) error->all(FLERR,"Error allocating space for args.");
     strcpy( tstrs[i], arg[i+6] + offset );
   }
 
@@ -143,7 +137,7 @@ FixNVEManifoldRattle::FixNVEManifoldRattle( LAMMPS *lmp, int &narg, char **arg,
   if (!ptr_m->params ) error->all(FLERR,"Failed to allocate params!");
   for( int i = 0; i < nvars; ++i ){
     // If param i was variable type, it will be set later...
-    ptr_m->params[i] = is_var[i] ? 0.0 : force->numeric( FLERR, arg[i+6] );
+    ptr_m->params[i] = is_var[i] ? 0.0 : utils::numeric( FLERR, arg[i+6] ,false,lmp);
   }
   ptr_m->post_param_init();
 
@@ -152,10 +146,10 @@ FixNVEManifoldRattle::FixNVEManifoldRattle( LAMMPS *lmp, int &narg, char **arg,
   int argi = 6 + nvars;
   while( argi < narg ){
     if (strcmp(arg[argi], "every") == 0) {
-      nevery = force->inumeric(FLERR,arg[argi+1]);
+      nevery = utils::inumeric(FLERR,arg[argi+1],false,lmp);
       next_output = update->ntimestep + nevery;
       if (comm->me == 0) {
-        fprintf(screen,"Outputing every %d steps, next is %d\n",
+        fprintf(screen,"Outputting every %d steps, next is %d\n",
                         nevery, next_output);
       }
       argi += 2;

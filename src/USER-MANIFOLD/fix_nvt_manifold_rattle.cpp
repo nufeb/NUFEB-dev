@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------
    Lammps - Large-scale Atomic/Molecular Massively Parallel Simulator
-   http://lammps.sandia.gov, Sandia National Laboratories
+   https://lammps.sandia.gov/, Sandia National Laboratories
    Steve Plimpton, sjplimp@sandia.gov
 
    Copyright (2003) Sandia Corporation.  Under the terms of Contract
@@ -21,7 +21,7 @@
    This file is part of the user-manifold package written by
    Stefan Paquay at the Eindhoven University of Technology.
    This module makes it possible to do MD with particles constrained
-   to pretty arbitrary manifolds characterised by some constraint function
+   to pretty arbitrary manifolds characterized by some constraint function
    g(x,y,z) = 0 and its normal grad(g). The number of manifolds available
    right now is limited but can be extended straightforwardly by making
    a new class that inherits from manifold and implements all pure virtual
@@ -32,25 +32,18 @@
 ------------------------------------------------------------------------- */
 
 
-#include <cstdio>
-#include <cstdlib>
+#include "fix_nvt_manifold_rattle.h"
 #include <cstring>
 #include <cmath>
 #include "atom.h"
 #include "force.h"
 #include "update.h"
-#include "respa.h"
 #include "error.h"
 #include "group.h"
-#include "input.h"
-#include "variable.h"
 #include "citeme.h"
-#include "memory.h"
-#include "comm.h"
 #include "modify.h"
 #include "compute.h"
 
-#include "fix_nvt_manifold_rattle.h"
 #include "manifold.h"
 
 
@@ -108,9 +101,9 @@ FixNVTManifoldRattle::FixNVTManifoldRattle(LAMMPS *lmp, int narg, char **arg,
       if (argi+3 >= narg)
         error->all(FLERR,"Keyword 'temp' needs 3 arguments");
 
-      t_start  = force->numeric(FLERR, arg[argi+1]);
-      t_stop   = force->numeric(FLERR, arg[argi+2]);
-      t_period = force->numeric(FLERR, arg[argi+3]);
+      t_start  = utils::numeric(FLERR, arg[argi+1],false,lmp);
+      t_stop   = utils::numeric(FLERR, arg[argi+2],false,lmp);
+      t_period = utils::numeric(FLERR, arg[argi+3],false,lmp);
       t_target = t_start;
       got_temp = 1;
 
@@ -119,7 +112,7 @@ FixNVTManifoldRattle::FixNVTManifoldRattle(LAMMPS *lmp, int narg, char **arg,
       if (argi+1 >= narg)
         error->all(FLERR,"Keyword 'tchain' needs 1 argument");
 
-      mtchain = force->inumeric(FLERR, arg[argi+1]);
+      mtchain = utils::inumeric(FLERR, arg[argi+1],false,lmp);
       argi += 2;
     } else if (error_on_unknown_keyword) {
       char msg[2048];

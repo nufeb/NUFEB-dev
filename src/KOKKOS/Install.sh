@@ -31,7 +31,7 @@ action () {
 KOKKOS_INSTALLED=0
 if (test -e ../Makefile.package) then
   KOKKOS_INSTALLED=`grep DLMP_KOKKOS ../Makefile.package | wc -l`
-fi 
+fi
 
 if (test $mode = 1) then
   if (test $KOKKOS_INSTALLED = 0) then
@@ -45,14 +45,14 @@ fi
 
 # list of files with optional dependcies
 
-action angle_charmm_kokkos.cpp angle_charmm.cpp 
+action angle_charmm_kokkos.cpp angle_charmm.cpp
 action angle_charmm_kokkos.h angle_charmm.h
-action angle_class2_kokkos.cpp angle_class2.cpp 
+action angle_class2_kokkos.cpp angle_class2.cpp
 action angle_class2_kokkos.h angle_class2.h
-action angle_cosine_kokkos.cpp angle_cosine.cpp 
+action angle_cosine_kokkos.cpp angle_cosine.cpp
 action angle_cosine_kokkos.h angle_cosine.h
-action angle_harmonic_kokkos.cpp angle_harmonic.cpp 
-action angle_harmonic_kokkos.h angle_harmonic.h 
+action angle_harmonic_kokkos.cpp angle_harmonic.cpp
+action angle_harmonic_kokkos.h angle_harmonic.h
 action atom_kokkos.cpp
 action atom_kokkos.h
 action atom_vec_angle_kokkos.cpp atom_vec_angle.cpp
@@ -77,7 +77,7 @@ action atom_vec_coccus_kokkos.cpp atom_vec_coccus.cpp
 action atom_vec_coccus_kokkos.h atom_vec_coccus.h
 action atom_vec_sphere_kokkos.cpp atom_vec_sphere.cpp
 action atom_vec_sphere_kokkos.h atom_vec_sphere.h
-action bond_class2_kokkos.cpp bond_class2.cpp 
+action bond_class2_kokkos.cpp bond_class2.cpp
 action bond_class2_kokkos.h bond_class2.h
 action bond_fene_kokkos.cpp bond_fene.cpp
 action bond_fene_kokkos.h bond_fene.h
@@ -89,20 +89,27 @@ action comm_grid_kokkos.cpp
 action comm_grid_kokkos.h
 action comm_tiled_kokkos.cpp
 action comm_tiled_kokkos.h
-action compute_ke_kokkos.cpp
-action compute_ke_kokkos.h
+action compute_coord_atom_kokkos.cpp
+action compute_coord_atom_kokkos.h
+action compute_orientorder_atom_kokkos.cpp
+action compute_orientorder_atom_kokkos.h
 action compute_temp_kokkos.cpp
 action compute_temp_kokkos.h
 action compute_volume_kokkos.cpp compute_volume.cpp
 action compute_volume_kokkos.h compute_volume.h
 action dihedral_charmm_kokkos.cpp dihedral_charmm.cpp
 action dihedral_charmm_kokkos.h dihedral_charmm.h
-action dihedral_class2_kokkos.cpp dihedral_class2.cpp 
+action dihedral_class2_kokkos.cpp dihedral_class2.cpp
 action dihedral_class2_kokkos.h dihedral_class2.h
+action dihedral_harmonic_kokkos.cpp dihedral_harmonic.cpp
+action dihedral_harmonic_kokkos.h dihedral_harmonic.h
 action dihedral_opls_kokkos.cpp dihedral_opls.cpp
 action dihedral_opls_kokkos.h dihedral_opls.h
 action domain_kokkos.cpp
 action domain_kokkos.h
+action fftdata_kokkos.h fft3d.h
+action fft3d_kokkos.cpp fft3d.cpp
+action fft3d_kokkos.h fft3d.h
 action fix_deform_kokkos.cpp
 action fix_deform_kokkos.h
 action fix_density_kokkos.cpp fix_density.cpp
@@ -131,6 +138,8 @@ action fix_monod_nob_kokkos.cpp fix_monod_nob.cpp
 action fix_monod_nob_kokkos.h fix_monod_nob.h
 action fix_monod_cyano_kokkos.cpp fix_monod_cyano.cpp
 action fix_monod_cyano_kokkos.h fix_monod_cyano.h
+action fix_minimize_kokkos.cpp
+action fix_minimize_kokkos.h
 action fix_neigh_history_kokkos.cpp
 action fix_neigh_history_kokkos.h
 action fix_nh_kokkos.cpp
@@ -185,9 +194,11 @@ action improper_class2_kokkos.cpp improper_class2.cpp
 action improper_class2_kokkos.h improper_class2.h
 action improper_harmonic_kokkos.cpp improper_harmonic.cpp
 action improper_harmonic_kokkos.h improper_harmonic.h
+action kissfft_kokkos.h kissfft.h
 action kokkos.cpp
 action kokkos.h
 action kokkos_base.h
+action kokkos_base_fft.h fft3d.h
 action kokkos_few.h
 action kokkos_type.h
 action memory_kokkos.h
@@ -217,6 +228,13 @@ action nufeb_run_kokkos.cpp nufeb_run.cpp
 action nufeb_run_kokkos.h nufeb_run.h
 action math_special_kokkos.cpp
 action math_special_kokkos.h
+action min_cg_kokkos.cpp
+action min_cg_kokkos.h
+action min_kokkos.cpp
+action min_kokkos.h
+action min_linesearch_kokkos.cpp
+action min_linesearch_kokkos.h
+action pack_kokkos.h pack.h
 action pair_buck_coul_cut_kokkos.cpp
 action pair_buck_coul_cut_kokkos.h
 action pair_buck_coul_long_kokkos.cpp pair_buck_coul_long.cpp
@@ -313,6 +331,8 @@ action rand_pool_wrap_kokkos.cpp
 action rand_pool_wrap_kokkos.h
 action region_block_kokkos.cpp
 action region_block_kokkos.h
+action remap_kokkos.cpp remap.cpp
+action remap_kokkos.h remap.h
 action sna_kokkos.h sna.h
 action sna_kokkos_impl.h sna.cpp
 action verlet_kokkos.cpp
