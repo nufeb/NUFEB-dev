@@ -116,6 +116,7 @@ function(RegisterStyles search_path)
     FindStyleHeaders(${search_path} PAIR_CLASS      pair_      PAIR      ) # pair      ) # force
     FindStyleHeaders(${search_path} READER_CLASS    reader_    READER    ) # reader    ) # read_dump
     FindStyleHeaders(${search_path} REGION_CLASS    region_    REGION    ) # region    ) # domain
+    FindStyleHeaders(${search_path} GRID_CLASS      grid_      GRID      ) # grid      ) # grid
 endfunction(RegisterStyles)
 
 function(RegisterStylesExt search_path extension sources)
@@ -139,6 +140,7 @@ function(RegisterStylesExt search_path extension sources)
     FindStyleHeadersExt(${search_path} PAIR_CLASS      ${extension}  PAIR      ${sources})
     FindStyleHeadersExt(${search_path} READER_CLASS    ${extension}  READER    ${sources})
     FindStyleHeadersExt(${search_path} REGION_CLASS    ${extension}  REGION    ${sources})
+    FindStyleHeadersExt(${search_path} GRID_CLASS      ${extension}  GRID      ${sources})
 endfunction(RegisterStylesExt)
 
 function(GenerateStyleHeaders output_path)
@@ -162,6 +164,7 @@ function(GenerateStyleHeaders output_path)
     GenerateStyleHeader(${output_path} PAIR       pair      ) # force
     GenerateStyleHeader(${output_path} READER     reader    ) # read_dump
     GenerateStyleHeader(${output_path} REGION     region    ) # domain
+    GenerateStyleHeader(${output_path} GRID       grid      ) # grid
 endfunction(GenerateStyleHeaders)
 
 function(DetectBuildSystemConflict lammps_src_dir)
