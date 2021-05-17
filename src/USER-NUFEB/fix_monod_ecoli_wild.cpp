@@ -15,7 +15,6 @@
 #include <cstring>
 #include <cmath>
 #include "atom.h"
-#include "force.h"
 #include "error.h"
 
 #include "fix_monod_ecoli_wild.h"
@@ -34,7 +33,7 @@ using namespace MathConst;
 FixMonodEcoliWild::FixMonodEcoliWild(LAMMPS *lmp, int narg, char **arg) :
   FixMonod(lmp, narg, arg)
 {
-  avec = NULL;
+  avec = nullptr;
   avec = (AtomVecBacillus *) atom->style_match("bacillus");
 
   if (narg < 8)
@@ -57,14 +56,14 @@ FixMonodEcoliWild::FixMonodEcoliWild(LAMMPS *lmp, int narg, char **arg) :
   isuc = grid->find(arg[3]);
   if (isuc < 0)
     error->all(FLERR, "Can't find substrate name");
-  suc_affinity = force->numeric(FLERR, arg[4]);
+  suc_affinity = utils::numeric(FLERR,arg[4],true,lmp);
   if (suc_affinity <= 0)
     error->all(FLERR, "Sucrose affinity must be greater than zero");
 
   io2 = grid->find(arg[5]);
   if (io2 < 0)
     error->all(FLERR, "Can't find substrate(o2) name");
-  o2_affinity = force->numeric(FLERR, arg[6]);
+  o2_affinity = utils::numeric(FLERR,arg[6],true,lmp);
   if (o2_affinity <= 0)
     error->all(FLERR, "O2 affinity must be greater than zero");
 
@@ -75,16 +74,16 @@ FixMonodEcoliWild::FixMonodEcoliWild(LAMMPS *lmp, int narg, char **arg) :
   int iarg = 8;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "growth") == 0) {
-      growth = force->numeric(FLERR, arg[iarg+1]);
+      growth = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "yield") == 0) {
-      yield = force->numeric(FLERR, arg[iarg+1]);
+      yield = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "maintain") == 0) {
-      maintain = force->numeric(FLERR, arg[iarg+1]);
+      maintain = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "decay") == 0) {
-      decay = force->numeric(FLERR, arg[iarg+1]);
+      decay = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else {
       error->all(FLERR, "Illegal fix nufeb/monod/ecoliw command");
@@ -127,6 +126,7 @@ void FixMonodEcoliWild::update_cells()
       reac[isuc][i] -= 1 / yield * tmp1 * dens[igroup][i];
       reac[io2][i] -= 0.399 * (tmp1 + tmp2) * dens[igroup][i];
       reac[ico2][i] += 0.2 * (tmp1 + tmp2) * dens[igroup][i];
+      if (reac[isuc][i] > 0) printf("%e \n", reac[isuc][i]);
     }
 
     if (Growth) {
@@ -139,7 +139,7 @@ void FixMonodEcoliWild::update_cells()
 
 void FixMonodEcoliWild::update_atoms()
 {
-  if (!avec) {
+  if (atom->coccus_flag) {
     update_atoms_coccus();
   } else {
     update_atoms_bacillus(avec);

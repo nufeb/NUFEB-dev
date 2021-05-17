@@ -184,7 +184,6 @@ class Atom : protected Pointers {
   int rho_flag,esph_flag,cv_flag,vest_flag;
   int dpd_flag,edpd_flag,tdpd_flag;
   int mesont_flag;
-  int bacillus_flag;
 
   // SPIN package
 
@@ -196,6 +195,11 @@ class Atom : protected Pointers {
   int smd_flag,damage_flag;
   int contact_radius_flag,smd_data_9_flag,smd_stress_flag;
   int eff_plastic_strain_flag,eff_plastic_strain_rate_flag;
+
+  // USER-NUFEB package
+  int bacillus_flag, coccus_flag;
+  int biomass_flag;
+  int outer_radius_flag, outer_mass_flag;
 
   // Peridynamics scale factor, used by dump cfg
 

@@ -984,9 +984,9 @@ void Thermo::parse_fields(char *str)
 
       delete [] id;
 
-    } else if (strcmp(word,"ndiff") == 0) {
+    } else if (word == "ndiff") {
       addfield("NDiff",&Thermo::compute_ndiff,BIGINT);
-    } else if (strcmp(word,"npair") == 0) {
+    } else if (word == "npair") {
       addfield("NPair",&Thermo::compute_npair,BIGINT);
     } else error->all(FLERR,"Unknown keyword in thermo_style custom command");
 

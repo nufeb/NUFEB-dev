@@ -20,7 +20,6 @@
 #include "atom_vec.h"
 #include "atom_vec_bacillus.h"
 #include "error.h"
-#include "force.h"
 #include "lmptype.h"
 #include "math_const.h"
 #include "update.h"
@@ -41,16 +40,16 @@ FixDivideBacillus::FixDivideBacillus(LAMMPS *lmp, int narg, char **arg) :
   FixDivide(lmp, narg, arg)
 {
   avec = (AtomVecBacillus *) atom->style_match("bacillus");
-  if (!avec) error->all(FLERR,"Fix nufeb/monod/ecoli/wild requires "
+  if (!avec) error->all(FLERR,"Fix nufeb/divide/bacillus requires "
       "atom style bacillus");
 
   if (narg < 5)
     error->all(FLERR, "Illegal fix nufeb/divide/bacillus command");
   
-  maxlength = force->numeric(FLERR, arg[3]);
+  maxlength = utils::numeric(FLERR,arg[3],true,lmp);
   if (maxlength <= 0)
     error->all(FLERR, "Max division length cannot be less or equal to 0");
-  seed = force->inumeric(FLERR, arg[4]);
+  seed = utils::inumeric(FLERR,arg[4],true,lmp);
 
   // Random number generator, same for all procs
   random = new RanPark(lmp, seed);

@@ -16,7 +16,6 @@
 #include <cmath>
 #include "fix_monod_eps.h"
 #include "atom.h"
-#include "force.h"
 #include "error.h"
 #include "grid.h"
 #include "group.h"
@@ -47,7 +46,7 @@ FixMonodEPS::FixMonodEPS(LAMMPS *lmp, int narg, char **arg) :
   int iarg = 4;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "decay") == 0) {
-      decay = force->numeric(FLERR, arg[iarg+1]);
+      decay = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else {
       error->all(FLERR, "Illegal fix nufeb/monod/eps command");

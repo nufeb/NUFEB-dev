@@ -15,7 +15,6 @@
 #include <cmath>
 #include "grid_vec.h"
 #include "grid.h"
-#include "force.h"
 #include "domain.h"
 #include "error.h"
 #include "grid_masks.h"
@@ -52,7 +51,7 @@ void GridVec::store_args(int narg, char **arg)
 
 void GridVec::process_args(int narg, char **arg)
 {
-  grid->nsubs = force->inumeric(FLERR,arg[0]);
+  grid->nsubs = utils::inumeric(FLERR,arg[0],true,lmp);
   if (narg < grid->nsubs + 1)
     error->all(FLERR,"Missing substrate names in grid_style command");
   grid->sub_names = new char*[grid->nsubs];
@@ -62,7 +61,7 @@ void GridVec::process_args(int narg, char **arg)
   }
   if (narg < grid->nsubs + 2)
     error->all(FLERR,"Missing cell size in grid_style command");
-  grid->cell_size = force->numeric(FLERR,arg[grid->nsubs+1]);
+  grid->cell_size = utils::numeric(FLERR,arg[grid->nsubs+1],true,lmp);
 }
 
 /* ---------------------------------------------------------------------- */

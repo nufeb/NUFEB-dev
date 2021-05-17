@@ -20,6 +20,8 @@
 #include "domain.h"
 #include "error.h"
 #include "fix.h"
+#include "input.h"
+#include "variable.h"
 #include "force.h"
 #include "improper.h"
 #include "kspace.h"
@@ -52,8 +54,8 @@ ComputePressure::ComputePressure(LAMMPS *lmp, int narg, char **arg) :
 
   vol_style = BOX;
   vol = 1.0;
-  vol_str = NULL;
   vol_index = -1;
+  vol_str = nullptr;
   
   // store temperature ID used by pressure computation
   // insure it is valid for temperature computation
@@ -137,7 +139,7 @@ ComputePressure::ComputePressure(LAMMPS *lmp, int narg, char **arg) :
 	  strcpy(vol_str, &arg[iarg+1][2]);
 	  vol_style = VARIABLE;
 	} else {
-	  vol = force->numeric(FLERR, arg[iarg+1]);
+	  vol = utils::inumeric(FLERR,arg[iarg+1],false,lmp);
 	  vol_style = CONSTANT;
 	}
 	iarg++;

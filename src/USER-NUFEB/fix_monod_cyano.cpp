@@ -17,7 +17,6 @@
 #include "fix_monod_cyano.h"
 #include "atom_vec_bacillus.h"
 #include "atom.h"
-#include "force.h"
 #include "error.h"
 #include "grid.h"
 #include "group.h"
@@ -33,7 +32,7 @@ using namespace MathConst;
 FixMonodCyano::FixMonodCyano(LAMMPS *lmp, int narg, char **arg) :
   FixMonod(lmp, narg, arg)
 {
-  avec = NULL;
+  avec = nullptr;
   avec = (AtomVecBacillus *) atom->style_match("bacillus");
 
   if (narg < 10)
@@ -61,7 +60,7 @@ FixMonodCyano::FixMonodCyano(LAMMPS *lmp, int narg, char **arg) :
   ilight = grid->find(arg[3]);
   if (ilight < 0)
     error->all(FLERR, "Can't find substrate(light) name");
-  light_affinity = force->numeric(FLERR, arg[4]);
+  light_affinity = utils::numeric(FLERR,arg[4],true,lmp);
   if (light_affinity <= 0)
     error->all(FLERR, "light affinity must be greater than zero");
 
@@ -72,7 +71,7 @@ FixMonodCyano::FixMonodCyano(LAMMPS *lmp, int narg, char **arg) :
   ico2 = grid->find(arg[6]);
   if (ico2 < 0)
     error->all(FLERR, "Can't find substrate(co2) name");
-  co2_affinity = force->numeric(FLERR, arg[7]);
+  co2_affinity = utils::numeric(FLERR,arg[7],true,lmp);
   if (co2_affinity <= 0)
     error->all(FLERR, "co2 affinity must be greater than zero");
 
@@ -87,22 +86,22 @@ FixMonodCyano::FixMonodCyano(LAMMPS *lmp, int narg, char **arg) :
   int iarg = 10;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "growth") == 0) {
-      growth = force->numeric(FLERR, arg[iarg+1]);
+      growth = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "yield") == 0) {
-      yield = force->numeric(FLERR, arg[iarg+1]);
+      yield = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "maintain") == 0) {
-      maintain = force->numeric(FLERR, arg[iarg+1]);
+      maintain = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "decay") == 0) {
-      decay = force->numeric(FLERR, arg[iarg+1]);
+      decay = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "suc_exp") == 0) {
-      suc_exp = force->numeric(FLERR, arg[iarg+1]);
+      suc_exp = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "gco2_flag") == 0) {
-      gco2_flag = force->inumeric(FLERR, arg[iarg+1]);
+      gco2_flag = utils::inumeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else {
       error->all(FLERR, "Illegal fix nufeb/monod/cyano command");
@@ -166,7 +165,7 @@ void FixMonodCyano::update_cells()
 
 void FixMonodCyano::update_atoms()
 {
-  if (!avec) {
+  if (atom->coccus_flag) {
     update_atoms_coccus();
   } else {
     update_atoms_bacillus(avec);

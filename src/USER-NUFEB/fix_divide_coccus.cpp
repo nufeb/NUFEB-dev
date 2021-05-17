@@ -19,7 +19,6 @@
 #include "atom.h"
 #include "atom_vec.h"
 #include "error.h"
-#include "force.h"
 #include "lmptype.h"
 #include "math_const.h"
 #include "random_park.h"
@@ -42,9 +41,9 @@ FixDivideCoccus::FixDivideCoccus(LAMMPS *lmp, int narg, char **arg) :
   if (narg < 6)
     error->all(FLERR, "Illegal fix nufeb/divide/coccus command");
   
-  diameter = force->numeric(FLERR, arg[3]);
-  eps_density = force->numeric(FLERR, arg[4]);
-  seed = force->inumeric(FLERR, arg[5]);
+  diameter = utils::numeric(FLERR,arg[3],true,lmp);
+  eps_density = utils::numeric(FLERR,arg[4],true,lmp);
+  seed = utils::inumeric(FLERR,arg[5],true,lmp);
   
   // Random number generator, same for all procs
   random = new RanPark(lmp, seed);

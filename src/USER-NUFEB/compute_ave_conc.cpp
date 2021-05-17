@@ -32,7 +32,7 @@ using namespace LAMMPS_NS;
 ComputeAveConc::ComputeAveConc(LAMMPS *lmp, int narg, char **arg) :
   Compute(lmp, narg, arg)
 {
-  if (narg != 3) error->all(FLERR,"Illegal compute avgcon command");
+  if (narg != 3) error->all(FLERR,"Illegal compute nufeb/ave_conc command");
 
   vector_flag = 1;
   extvector = 0;

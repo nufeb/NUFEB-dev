@@ -20,7 +20,6 @@
 #include "atom_vec.h"
 #include "atom_vec_bacillus.h"
 #include "error.h"
-#include "force.h"
 #include "lmptype.h"
 #include "math_const.h"
 #include "update.h"
@@ -52,16 +51,16 @@ FixDivideBacillusMinicell::FixDivideBacillusMinicell(LAMMPS *lmp, int narg, char
   if (imini < 0)
     error->all(FLERR, "Can't find minicell group name");
 
-  type = force->inumeric(FLERR, arg[4]);
+  type = utils::inumeric(FLERR,arg[4],true,lmp);
 
-  maxlength = force->numeric(FLERR, arg[5]);
+  maxlength = utils::numeric(FLERR,arg[5],true,lmp);
   if (maxlength <= 0)
     error->all(FLERR, "Max division length must be greater than 0");
-  prob = force->numeric(FLERR, arg[6]);
+  prob = utils::numeric(FLERR,arg[6],true,lmp);
 
   if (prob < 0 || prob > 1)
     error->all(FLERR, "Minicell division probability must be between 0-1");
-  seed = force->inumeric(FLERR, arg[7]);
+  seed = utils::numeric(FLERR,arg[7],true,lmp);
 
   // Random number generator, same for all procs
   random = new RanPark(lmp, seed);

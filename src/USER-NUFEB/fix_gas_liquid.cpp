@@ -20,7 +20,6 @@
 
 #include "grid.h"
 #include "grid_masks.h"
-#include "force.h"
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -61,35 +60,35 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
   int iarg = 5;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "kga") == 0) {
-      kga = force->numeric(FLERR, arg[iarg+1]);
+      kga = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "h") == 0) {
-      h = force->numeric(FLERR, arg[iarg+1]);
+      h = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (h <= 0)
 	error->all(FLERR, "Henry's law solubility constant (H) must be positive");
       iarg += 2;
     } else if (strcmp(arg[iarg], "temp") == 0) {
-      temp = force->numeric(FLERR, arg[iarg+1]);
+      temp = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (temp <= 0)
 	error->all(FLERR, "Temperature (temp) must be positive");
       iarg += 2;
     } else if (strcmp(arg[iarg], "reactor_vhead") == 0) {
-      reactor_vhead = force->numeric(FLERR, arg[iarg+1]);
+      reactor_vhead = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (reactor_vhead <= 0)
 	error->all(FLERR, "Reactor headspace volume (reactor_vhead) must be positive");
       iarg += 2;
     } else if (strcmp(arg[iarg], "reactor_pres") == 0) {
-      reactor_pres = force->numeric(FLERR, arg[iarg+1]);
+      reactor_pres = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (reactor_pres <= 0)
 	error->all(FLERR, "Reactor headspace pressure (reactor_pres) must be positive");
       iarg += 2;
     } else if (strcmp(arg[iarg], "rg") == 0) {
-      rg = force->numeric(FLERR, arg[iarg+1]);
+      rg = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (rg <= 0)
 	error->all(FLERR, "Ideal gas constant must be positive");
       iarg += 2;
     } else if (strcmp(arg[iarg], "mw") == 0) {
-      mw = force->numeric(FLERR, arg[iarg+1]);
+      mw = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (mw <= 0)
 	error->all(FLERR, "Molar mass must be positive");
       iarg += 2;

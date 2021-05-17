@@ -20,7 +20,6 @@
 #include "error.h"
 #include "grid.h"
 #include "grid_masks.h"
-#include "force.h"
 #include "update.h"
 #include "domain.h"
 #include "memory.h"
@@ -51,15 +50,15 @@ FixReactorSoluteBalance::FixReactorSoluteBalance(LAMMPS *lmp, int narg, char **a
   int iarg = 4;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "q") == 0) {
-      q = force->numeric(FLERR, arg[iarg+1]);
+      q = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "reactor_vol") == 0) {
-      rvol = force->numeric(FLERR, arg[iarg+1]);
+      rvol = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (rvol <= 0)
         error->all(FLERR, "Bioreactor volume must be positive");
       iarg += 2;
     } else if (strcmp(arg[iarg], "reactor_af") == 0) {
-	reactor_af = force->numeric(FLERR, arg[iarg+1]);
+	reactor_af = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       if (reactor_af < 0)
         error->all(FLERR, "Reactor biofilm surface area cannot be negative");
       iarg += 2;

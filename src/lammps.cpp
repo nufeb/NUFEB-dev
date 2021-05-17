@@ -61,6 +61,7 @@
 
 #include "grid.h"
 #include "comm_grid.h"
+#include "style_grid.h"    // IWYU pragma: keep
 
 using namespace LAMMPS_NS;
 
@@ -76,6 +77,7 @@ struct LAMMPS_NS::package_styles_lists {
   std::map<std::string,std::string> dihedral_styles;
   std::map<std::string,std::string> dump_styles;
   std::map<std::string,std::string> fix_styles;
+  std::map<std::string,std::string> grid_styles;
   std::map<std::string,std::string> improper_styles;
   std::map<std::string,std::string> integrate_styles;
   std::map<std::string,std::string> kspace_styles;
@@ -994,6 +996,12 @@ void _noopt LAMMPS::init_pkg_lists()
 #include "packages_fix.h"
 #undef FixStyle
 #undef FIX_CLASS
+#define GRID_CLASS
+#define GridStyle(key,Class)                     \
+  pkg_lists->grid_styles[#key] = PACKAGE;
+#include "packages_grid.h"
+#undef GridStyle
+#undef GRID_CLASS
 #define IMPROPER_CLASS
 #define ImproperStyle(key,Class)                \
   pkg_lists->improper_styles[#key] = PACKAGE;

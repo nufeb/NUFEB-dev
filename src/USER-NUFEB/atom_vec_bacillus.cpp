@@ -13,18 +13,17 @@
 
 #include "atom_vec_bacillus.h"
 
-#include <cstdlib>
-#include <math.h>
 #include "atom.h"
-#include "comm.h"
-#include "domain.h"
-#include "modify.h"
-#include "force.h"
-#include "fix.h"
-#include "memory.h"
-#include "math_extra.h"
-#include "math_const.h"
 #include "error.h"
+#include "fix.h"
+#include "fix_adapt.h"
+#include "memory.h"
+#include "modify.h"
+#include "math_const.h"
+#include "math_extra.h"
+#include "math_eigen.h"
+
+#include <cstring>
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
@@ -36,17 +35,18 @@ enum{SPHERE,ROD};       // also in DumpImage
 
 AtomVecBacillus::AtomVecBacillus(LAMMPS *lmp) : AtomVec(lmp)
 {
-  molecular = 0;
+  molecular = Atom::ATOMIC;
+  bonus_flag = 1;
 
-  comm_x_only = comm_f_only = 0;
-  size_forward = 7;
-  size_reverse = 6;
-  size_border = 25;
-  size_velocity = 6;
-  size_data_atom = 8;
-  size_data_vel = 7;
+  // first 3 sizes do not include values from body itself
+  // 1st,2nd body counts are added in process_args() via body style
+  // 3rd body count is added in size_restart_bonus()
+  // size_data_bonus is not used by Atom class for body style
+
+  size_forward_bonus = 4;
+  size_border_bonus = 16;
+  size_restart_bonus_one = 16;
   size_data_bonus = 11;
-  xcol_data = 5;
 
   atom->bacillus_flag = 1;
   atom->rmass_flag = 1;
@@ -55,7 +55,25 @@ AtomVecBacillus::AtomVecBacillus(LAMMPS *lmp) : AtomVec(lmp)
   atom->radius_flag = 1;
 
   nlocal_bonus = nghost_bonus = nmax_bonus = 0;
-  bonus = NULL;
+  bonus = nullptr;
+
+  // strings with peratom variables to include in each AtomVec method
+  // strings cannot contain fields in corresponding AtomVec default strings
+  // order of fields in a string does not matter
+  // except: fields_data_atom & fields_data_vel must match data file
+
+  fields_grow = (char *) "radius rmass angmom torque bacillus biomass";
+  fields_copy = (char *) "radius rmass angmom biomass";
+  fields_comm = (char *) "rmass biomass";
+  fields_comm_vel = (char *) "angmom rmass biomass";
+  fields_reverse = (char *) "torque biomass";
+  fields_border = (char *) "radius rmass biomass";
+  fields_border_vel = (char *) "radius rmass angmom biomass";
+  fields_exchange = (char *) "radius rmass angmom biomass";
+  fields_restart = (char *) "radius rmass angmom biomass";
+  fields_create = (char *) "radius rmass angmom bacillus biomass";
+  fields_data_atom = (char *) "id type bacillus rmass x biomass";
+  fields_data_vel = (char *) "id v angmom";
 }
 
 /* ---------------------------------------------------------------------- */
@@ -66,51 +84,62 @@ AtomVecBacillus::~AtomVecBacillus()
 }
 
 /* ----------------------------------------------------------------------
-   grow atom arrays
-   n = 0 grows arrays by a chunk
-   n > 0 allocates arrays to size n
+   process sub-style args
+   optional arg = 0/1 for static/dynamic particle radii
 ------------------------------------------------------------------------- */
 
-void AtomVecBacillus::grow(int n)
+void AtomVecBacillus::process_args(int narg, char **arg)
 {
-  if (n == 0) grow_nmax();
-  else nmax = n;
-  atom->nmax = nmax;
-  if (nmax < 0 || nmax > MAXSMALLINT)
-    error->one(FLERR,"Per-processor system is too big");
+  if (narg != 0 && narg != 1)
+    error->all(FLERR,"Illegal atom_style bacillus command");
 
-  tag = memory->grow(atom->tag,nmax,"atom:tag");
-  type = memory->grow(atom->type,nmax,"atom:type");
-  mask = memory->grow(atom->mask,nmax,"atom:mask");
-  image = memory->grow(atom->image,nmax,"atom:image");
-  x = memory->grow(atom->x,nmax,3,"atom:x");
-  v = memory->grow(atom->v,nmax,3,"atom:v");
-  f = memory->grow(atom->f,nmax*comm->nthreads,3,"atom:f");
+  radvary = 0;
+  if (narg == 1) {
+    radvary = utils::numeric(FLERR,arg[0],true,lmp);
+    if (radvary < 0 || radvary > 1)
+      error->all(FLERR,"Illegal atom_style bacillus command");
+  }
 
-  radius = memory->grow(atom->radius,nmax,"atom:radius");
-  rmass = memory->grow(atom->rmass,nmax,"atom:rmass");
-  biomass = memory->grow(atom->biomass,nmax,"atom:biomass");
-  angmom = memory->grow(atom->angmom,nmax,3,"atom:angmom");
-  torque = memory->grow(atom->torque,nmax*comm->nthreads,3,"atom:torque");
-  bacillus = memory->grow(atom->bacillus,nmax,"atom:bacillus");
+  // dynamic particle properties must be communicated every step
 
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      modify->fix[atom->extra_grow[iextra]]->grow_arrays(nmax);
+  if (radvary) {
+    fields_comm = (char *) "radius rmass biomass";
+    fields_comm_vel = (char *) "radius rmass angmom biomass";
+  }
+
+  // delay setting up of fields until now
+
+  setup_fields();
 }
 
+/* ---------------------------------------------------------------------- */
+
+void AtomVecBacillus::init()
+{
+  AtomVec::init();
+
+  // check if optional radvary setting should have been set to 1
+
+  for (int i = 0; i < modify->nfix; i++)
+    if (strcmp(modify->fix[i]->style,"adapt") == 0) {
+      FixAdapt *fix = (FixAdapt *) modify->fix[i];
+      if (fix->diamflag && radvary == 0)
+        error->all(FLERR,"Fix adapt changes particle radii "
+                   "but atom_style bacillus is not dynamic");
+    }
+}
 /* ----------------------------------------------------------------------
-   reset local array ptrs
+   set local copies of all grow ptrs used by this class, except defaults
+   needed in replicate when 2 atom classes exist and it calls pack_restart()
 ------------------------------------------------------------------------- */
 
-void AtomVecBacillus::grow_reset()
+void AtomVecBacillus::grow_pointers()
 {
-  tag = atom->tag; type = atom->type;
-  mask = atom->mask; image = atom->image;
-  x = atom->x; v = atom->v; f = atom->f;
-  radius = atom->radius; rmass = atom->rmass; biomass = atom->biomass;
-  angmom = atom->angmom; torque = atom->torque;
+  radius = atom->radius;
   bacillus = atom->bacillus;
+  rmass = atom->rmass;
+  biomass = atom->biomass;
+  angmom = atom->angmom;
 }
 
 /* ----------------------------------------------------------------------
@@ -128,34 +157,15 @@ void AtomVecBacillus::grow_bonus()
 }
 
 /* ----------------------------------------------------------------------
-   copy atom I info to atom J
-   if delflag and atom J has bonus data, then delete it
+   copy atom I bonus info to atom J
 ------------------------------------------------------------------------- */
 
-void AtomVecBacillus::copy(int i, int j, int delflag)
+void AtomVecBacillus::copy_bonus(int i, int j, int delflag)
 {
-  tag[j] = tag[i];
-  type[j] = type[i];
-  mask[j] = mask[i];
-  image[j] = image[i];
-  x[j][0] = x[i][0];
-  x[j][1] = x[i][1];
-  x[j][2] = x[i][2];
-  v[j][0] = v[i][0];
-  v[j][1] = v[i][1];
-  v[j][2] = v[i][2];
-
-  radius[j] = radius[i];
-  rmass[j] = rmass[i];
-  biomass[j] = biomass[i];
-  angmom[j][0] = angmom[i][0];
-  angmom[j][1] = angmom[i][1];
-  angmom[j][2] = angmom[i][2];
-
   // if deleting atom J via delflag and J has bonus data, then delete it
 
   if (delflag && bacillus[j] >= 0) {
-    copy_bonus(nlocal_bonus-1,bacillus[j]);
+    copy_bonus_all(nlocal_bonus-1,bacillus[j]);
     nlocal_bonus--;
   }
 
@@ -164,18 +174,14 @@ void AtomVecBacillus::copy(int i, int j, int delflag)
 
   if (bacillus[i] >= 0 && i != j) bonus[bacillus[i]].ilocal = j;
   bacillus[j] = bacillus[i];
-
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      modify->fix[atom->extra_grow[iextra]]->copy_arrays(i,j,delflag);
 }
 
 /* ----------------------------------------------------------------------
    copy bonus data from I to J, effectively deleting the J entry
-   also reset body that points to I to now point to J
+   also reset ellipsoid that points to I to now point to J
 ------------------------------------------------------------------------- */
 
-void AtomVecBacillus::copy_bonus(int i, int j)
+void AtomVecBacillus::copy_bonus_all(int i, int j)
 {
   bacillus[bonus[i].ilocal] = j;
   memcpy(&bonus[j],&bonus[i],sizeof(Bonus));
@@ -189,158 +195,15 @@ void AtomVecBacillus::copy_bonus(int i, int j)
 void AtomVecBacillus::clear_bonus()
 {
   nghost_bonus = 0;
+
+  if (atom->nextra_grow)
+    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
+      modify->fix[atom->extra_grow[iextra]]->clear_bonus();
 }
 
 /* ---------------------------------------------------------------------- */
 
-int AtomVecBacillus::pack_comm(int n, int *list, double *buf,
-                          int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz;
-  double *quat;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      if (bacillus[j] >= 0) {
-        quat = bonus[bacillus[j]].quat;
-        buf[m++] = quat[0];
-        buf[m++] = quat[1];
-        buf[m++] = quat[2];
-        buf[m++] = quat[3];
-      }
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0]*domain->xprd + pbc[5]*domain->xy + pbc[4]*domain->xz;
-      dy = pbc[1]*domain->yprd + pbc[3]*domain->yz;
-      dz = pbc[2]*domain->zprd;
-    }
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0] + dx;
-      buf[m++] = x[j][1] + dy;
-      buf[m++] = x[j][2] + dz;
-      if (bacillus[j] >= 0) {
-        quat = bonus[bacillus[j]].quat;
-        buf[m++] = quat[0];
-        buf[m++] = quat[1];
-        buf[m++] = quat[2];
-        buf[m++] = quat[3];
-      }
-    }
-  }
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_comm_vel(int n, int *list, double *buf,
-                              int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz,dvx,dvy,dvz;
-  double *quat;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      if (bacillus[j] >= 0) {
-        quat = bonus[bacillus[j]].quat;
-        buf[m++] = quat[0];
-        buf[m++] = quat[1];
-        buf[m++] = quat[2];
-        buf[m++] = quat[3];
-      }
-      buf[m++] = v[j][0];
-      buf[m++] = v[j][1];
-      buf[m++] = v[j][2];
-      buf[m++] = angmom[j][0];
-      buf[m++] = angmom[j][1];
-      buf[m++] = angmom[j][2];
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0]*domain->xprd + pbc[5]*domain->xy + pbc[4]*domain->xz;
-      dy = pbc[1]*domain->yprd + pbc[3]*domain->yz;
-      dz = pbc[2]*domain->zprd;
-    }
-    if (!deform_vremap) {
-      for (i = 0; i < n; i++) {
-        j = list[i];
-        buf[m++] = x[j][0] + dx;
-        buf[m++] = x[j][1] + dy;
-        buf[m++] = x[j][2] + dz;
-        if (bacillus[j] >= 0) {
-          quat = bonus[bacillus[j]].quat;
-          buf[m++] = quat[0];
-          buf[m++] = quat[1];
-          buf[m++] = quat[2];
-          buf[m++] = quat[3];
-        }
-        buf[m++] = v[j][0];
-        buf[m++] = v[j][1];
-        buf[m++] = v[j][2];
-        buf[m++] = angmom[j][0];
-        buf[m++] = angmom[j][1];
-        buf[m++] = angmom[j][2];
-      }
-    } else {
-      dvx = pbc[0]*h_rate[0] + pbc[5]*h_rate[5] + pbc[4]*h_rate[4];
-      dvy = pbc[1]*h_rate[1] + pbc[3]*h_rate[3];
-      dvz = pbc[2]*h_rate[2];
-      for (i = 0; i < n; i++) {
-        j = list[i];
-        buf[m++] = x[j][0] + dx;
-        buf[m++] = x[j][1] + dy;
-        buf[m++] = x[j][2] + dz;
-        if (bacillus[j] >= 0) {
-          quat = bonus[bacillus[j]].quat;
-          buf[m++] = quat[0];
-          buf[m++] = quat[1];
-          buf[m++] = quat[2];
-          buf[m++] = quat[3];
-        }
-        if (mask[i] & deform_groupbit) {
-          buf[m++] = v[j][0] + dvx;
-          buf[m++] = v[j][1] + dvy;
-          buf[m++] = v[j][2] + dvz;
-        } else {
-          buf[m++] = v[j][0];
-          buf[m++] = v[j][1];
-          buf[m++] = v[j][2];
-        }
-        buf[m++] = angmom[j][0];
-        buf[m++] = angmom[j][1];
-        buf[m++] = angmom[j][2];
-      }
-    }
-  }
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_comm_hybrid(int n, int *list, double *buf)
+int AtomVecBacillus::pack_comm_bonus(int n, int *list, double *buf)
 {
   int i,j,m;
   double *quat;
@@ -356,12 +219,13 @@ int AtomVecBacillus::pack_comm_hybrid(int n, int *list, double *buf)
       buf[m++] = quat[3];
     }
   }
+
   return m;
 }
 
 /* ---------------------------------------------------------------------- */
 
-void AtomVecBacillus::unpack_comm(int n, int first, double *buf)
+void AtomVecBacillus::unpack_comm_bonus(int n, int first, double *buf)
 {
   int i,m,last;
   double *quat;
@@ -369,9 +233,6 @@ void AtomVecBacillus::unpack_comm(int n, int first, double *buf)
   m = 0;
   last = first + n;
   for (i = first; i < last; i++) {
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
     if (bacillus[i] >= 0) {
       quat = bonus[bacillus[i]].quat;
       quat[0] = buf[m++];
@@ -384,390 +245,7 @@ void AtomVecBacillus::unpack_comm(int n, int first, double *buf)
 
 /* ---------------------------------------------------------------------- */
 
-void AtomVecBacillus::unpack_comm_vel(int n, int first, double *buf)
-{
-  int i,m,last;
-  double *quat;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
-    if (bacillus[i] >= 0) {
-      quat = bonus[bacillus[i]].quat;
-      quat[0] = buf[m++];
-      quat[1] = buf[m++];
-      quat[2] = buf[m++];
-      quat[3] = buf[m++];
-    }
-    v[i][0] = buf[m++];
-    v[i][1] = buf[m++];
-    v[i][2] = buf[m++];
-    angmom[i][0] = buf[m++];
-    angmom[i][1] = buf[m++];
-    angmom[i][2] = buf[m++];
-  }
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::unpack_comm_hybrid(int n, int first, double *buf)
-{
-  int i,m,last;
-  double *quat;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++)
-    if (bacillus[i] >= 0) {
-      quat = bonus[bacillus[i]].quat;
-      quat[0] = buf[m++];
-      quat[1] = buf[m++];
-      quat[2] = buf[m++];
-      quat[3] = buf[m++];
-    }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_reverse(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    buf[m++] = f[i][0];
-    buf[m++] = f[i][1];
-    buf[m++] = f[i][2];
-    buf[m++] = torque[i][0];
-    buf[m++] = torque[i][1];
-    buf[m++] = torque[i][2];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_reverse_hybrid(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    buf[m++] = torque[i][0];
-    buf[m++] = torque[i][1];
-    buf[m++] = torque[i][2];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-void AtomVecBacillus::unpack_reverse(int n, int *list, double *buf)
-{
-  int i,j,m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    f[j][0] += buf[m++];
-    f[j][1] += buf[m++];
-    f[j][2] += buf[m++];
-    torque[j][0] += buf[m++];
-    torque[j][1] += buf[m++];
-    torque[j][2] += buf[m++];
-  }
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::unpack_reverse_hybrid(int n, int *list, double *buf)
-{
-  int i,j,m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    torque[j][0] += buf[m++];
-    torque[j][1] += buf[m++];
-    torque[j][2] += buf[m++];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_border(int n, int *list, double *buf,
-                            int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz;
-  double *quat,*inertia,*pole1,*pole2;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      buf[m++] = ubuf(tag[j]).d;
-      buf[m++] = ubuf(type[j]).d;
-      buf[m++] = ubuf(mask[j]).d;
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      if (bacillus[j] < 0) buf[m++] = ubuf(0).d;
-      else {
-        buf[m++] = ubuf(1).d;
-        quat = bonus[bacillus[j]].quat;
-        inertia = bonus[bacillus[j]].inertia;
-        pole1 = bonus[bacillus[j]].pole1;
-        pole2 = bonus[bacillus[j]].pole2;
-        buf[m++] = quat[0];
-        buf[m++] = quat[1];
-        buf[m++] = quat[2];
-        buf[m++] = quat[3];
-        buf[m++] = inertia[0];
-        buf[m++] = inertia[1];
-        buf[m++] = inertia[2];
-        buf[m++] = pole1[0];
-        buf[m++] = pole1[1];
-        buf[m++] = pole1[2];
-        buf[m++] = pole2[0];
-        buf[m++] = pole2[1];
-        buf[m++] = pole2[2];
-        buf[m++] = bonus[bacillus[j]].length;
-        buf[m++] = bonus[bacillus[j]].diameter;
-      }
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0];
-      dy = pbc[1];
-      dz = pbc[2];
-    }
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0] + dx;
-      buf[m++] = x[j][1] + dy;
-      buf[m++] = x[j][2] + dz;
-      buf[m++] = ubuf(tag[j]).d;
-      buf[m++] = ubuf(type[j]).d;
-      buf[m++] = ubuf(mask[j]).d;
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      if (bacillus[j] < 0) buf[m++] = ubuf(0).d;
-      else {
-        buf[m++] = ubuf(1).d;
-        quat = bonus[bacillus[j]].quat;
-        inertia = bonus[bacillus[j]].inertia;
-        pole1 = bonus[bacillus[j]].pole1;
-        pole2 = bonus[bacillus[j]].pole2;
-        buf[m++] = quat[0];
-        buf[m++] = quat[1];
-        buf[m++] = quat[2];
-        buf[m++] = quat[3];
-        buf[m++] = inertia[0];
-        buf[m++] = inertia[1];
-        buf[m++] = inertia[2];
-        buf[m++] = pole1[0];
-        buf[m++] = pole1[1];
-        buf[m++] = pole1[2];
-        buf[m++] = pole2[0];
-        buf[m++] = pole2[1];
-        buf[m++] = pole2[2];
-        buf[m++] = bonus[bacillus[j]].length;
-        buf[m++] = bonus[bacillus[j]].diameter;
-      }
-    }
-  }
-
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->pack_border(n,list,&buf[m]);
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_border_vel(int n, int *list, double *buf,
-                                int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz,dvx,dvy,dvz;
-  double *quat,*inertia,*pole1,*pole2;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      buf[m++] = ubuf(tag[j]).d;
-      buf[m++] = ubuf(type[j]).d;
-      buf[m++] = ubuf(mask[j]).d;
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      if (bacillus[j] < 0) buf[m++] = ubuf(0).d;
-      else {
-        buf[m++] = ubuf(1).d;
-        quat = bonus[bacillus[j]].quat;
-        inertia = bonus[bacillus[j]].inertia;
-        pole1 = bonus[bacillus[j]].pole1;
-        pole2 = bonus[bacillus[j]].pole2;
-        buf[m++] = quat[0];
-        buf[m++] = quat[1];
-        buf[m++] = quat[2];
-        buf[m++] = quat[3];
-        buf[m++] = inertia[0];
-        buf[m++] = inertia[1];
-        buf[m++] = inertia[2];
-        buf[m++] = pole1[0];
-        buf[m++] = pole1[1];
-        buf[m++] = pole1[2];
-        buf[m++] = pole2[0];
-        buf[m++] = pole2[1];
-        buf[m++] = pole2[2];
-        buf[m++] = bonus[bacillus[j]].length;
-        buf[m++] = bonus[bacillus[j]].diameter;
-      }
-      buf[m++] = v[j][0];
-      buf[m++] = v[j][1];
-      buf[m++] = v[j][2];
-      buf[m++] = angmom[j][0];
-      buf[m++] = angmom[j][1];
-      buf[m++] = angmom[j][2];
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0];
-      dy = pbc[1];
-      dz = pbc[2];
-    }
-    if (!deform_vremap) {
-      for (i = 0; i < n; i++) {
-        j = list[i];
-        buf[m++] = x[j][0] + dx;
-        buf[m++] = x[j][1] + dy;
-        buf[m++] = x[j][2] + dz;
-        buf[m++] = ubuf(tag[j]).d;
-        buf[m++] = ubuf(type[j]).d;
-        buf[m++] = ubuf(mask[j]).d;
-        buf[m++] = radius[j];
-        buf[m++] = rmass[j];
-        buf[m++] = biomass[j];
-        if (bacillus[j] < 0) buf[m++] = ubuf(0).d;
-        else {
-          buf[m++] = ubuf(1).d;
-          quat = bonus[bacillus[j]].quat;
-          inertia = bonus[bacillus[j]].inertia;
-          pole1 = bonus[bacillus[j]].pole1;
-          pole2 = bonus[bacillus[j]].pole2;
-          buf[m++] = quat[0];
-          buf[m++] = quat[1];
-          buf[m++] = quat[2];
-          buf[m++] = quat[3];
-          buf[m++] = inertia[0];
-          buf[m++] = inertia[1];
-          buf[m++] = inertia[2];
-          buf[m++] = pole1[0];
-          buf[m++] = pole1[1];
-          buf[m++] = pole1[2];
-          buf[m++] = pole2[0];
-          buf[m++] = pole2[1];
-          buf[m++] = pole2[2];
-          buf[m++] = bonus[bacillus[j]].length;
-          buf[m++] = bonus[bacillus[j]].diameter;
-        }
-        buf[m++] = v[j][0];
-        buf[m++] = v[j][1];
-        buf[m++] = v[j][2];
-        buf[m++] = angmom[j][0];
-        buf[m++] = angmom[j][1];
-        buf[m++] = angmom[j][2];
-      }
-    } else {
-      dvx = pbc[0]*h_rate[0] + pbc[5]*h_rate[5] + pbc[4]*h_rate[4];
-      dvy = pbc[1]*h_rate[1] + pbc[3]*h_rate[3];
-      dvz = pbc[2]*h_rate[2];
-      for (i = 0; i < n; i++) {
-        j = list[i];
-        buf[m++] = x[j][0] + dx;
-        buf[m++] = x[j][1] + dy;
-        buf[m++] = x[j][2] + dz;
-        buf[m++] = ubuf(tag[j]).d;
-        buf[m++] = ubuf(type[j]).d;
-        buf[m++] = ubuf(mask[j]).d;
-        buf[m++] = radius[j];
-        buf[m++] = rmass[j];
-        buf[m++] = biomass[j];
-        if (bacillus[j] < 0) buf[m++] = ubuf(0).d;
-        else {
-          buf[m++] = ubuf(1).d;
-          quat = bonus[bacillus[j]].quat;
-          inertia = bonus[bacillus[j]].inertia;
-          pole1 = bonus[bacillus[j]].pole1;
-          pole2 = bonus[bacillus[j]].pole2;
-          buf[m++] = quat[0];
-          buf[m++] = quat[1];
-          buf[m++] = quat[2];
-          buf[m++] = quat[3];
-          buf[m++] = inertia[0];
-          buf[m++] = inertia[1];
-          buf[m++] = inertia[2];
-          buf[m++] = pole1[0];
-          buf[m++] = pole1[1];
-          buf[m++] = pole1[2];
-          buf[m++] = pole2[0];
-          buf[m++] = pole2[1];
-          buf[m++] = pole2[2];
-          buf[m++] = bonus[bacillus[j]].length;
-          buf[m++] = bonus[bacillus[j]].diameter;
-        }
-        if (mask[i] & deform_groupbit) {
-          buf[m++] = v[j][0] + dvx;
-          buf[m++] = v[j][1] + dvy;
-          buf[m++] = v[j][2] + dvz;
-        } else {
-          buf[m++] = v[j][0];
-          buf[m++] = v[j][1];
-          buf[m++] = v[j][2];
-        }
-        buf[m++] = angmom[j][0];
-        buf[m++] = angmom[j][1];
-        buf[m++] = angmom[j][2];
-      }
-    }
-  }
-
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->pack_border(n,list,&buf[m]);
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_border_hybrid(int n, int *list, double *buf)
+int AtomVecBacillus::pack_border_bonus(int n, int *list, double *buf)
 {
   int i,j,m;
   double *quat,*inertia,*pole1,*pole2;
@@ -775,9 +253,6 @@ int AtomVecBacillus::pack_border_hybrid(int n, int *list, double *buf)
   m = 0;
   for (i = 0; i < n; i++) {
     j = list[i];
-    buf[m++] = radius[j];
-    buf[m++] = rmass[j];
-    buf[m++] = biomass[j];
     if (bacillus[j] < 0) buf[m++] = ubuf(0).d;
     else {
       buf[m++] = ubuf(1).d;
@@ -802,12 +277,13 @@ int AtomVecBacillus::pack_border_hybrid(int n, int *list, double *buf)
       buf[m++] = bonus[bacillus[j]].diameter;
     }
   }
+
   return m;
 }
 
 /* ---------------------------------------------------------------------- */
 
-void AtomVecBacillus::unpack_border(int n, int first, double *buf)
+int AtomVecBacillus::unpack_border_bonus(int n, int first, double *buf)
 {
   int i,j,m,last;
   double *quat,*inertia,*pole1,*pole2;
@@ -815,21 +291,12 @@ void AtomVecBacillus::unpack_border(int n, int first, double *buf)
   m = 0;
   last = first + n;
   for (i = first; i < last; i++) {
-    if (i == nmax) grow(0);
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
-    tag[i] = (tagint) ubuf(buf[m++]).i;
-    type[i] = (int) ubuf(buf[m++]).i;
-    mask[i] = (int) ubuf(buf[m++]).i;
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
     bacillus[i] = (int) ubuf(buf[m++]).i;
     if (bacillus[i] == 0) bacillus[i] = -1;
     else {
       j = nlocal_bonus + nghost_bonus;
       if (j == nmax_bonus) grow_bonus();
+
       quat = bonus[j].quat;
       inertia = bonus[j].inertia;
       pole1 = bonus[j].pole1;
@@ -855,116 +322,6 @@ void AtomVecBacillus::unpack_border(int n, int first, double *buf)
     }
   }
 
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->
-        unpack_border(n,first,&buf[m]);
-}
-
-/* ---------------------------------------------------------------------- */
-
-void AtomVecBacillus::unpack_border_vel(int n, int first, double *buf)
-{
-  int i,j,m,last;
-  double *quat,*inertia,*pole1,*pole2;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    if (i == nmax) grow(0);
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
-    tag[i] = (tagint) ubuf(buf[m++]).i;
-    type[i] = (int) ubuf(buf[m++]).i;
-    mask[i] = (int) ubuf(buf[m++]).i;
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    bacillus[i] = (int) ubuf(buf[m++]).i;
-    if (bacillus[i] == 0) bacillus[i] = -1;
-    else {
-      j = nlocal_bonus + nghost_bonus;
-      if (j == nmax_bonus) grow_bonus();
-      quat = bonus[j].quat;
-      inertia = bonus[j].inertia;
-      pole1 = bonus[j].pole1;
-      pole2 = bonus[j].pole2;
-      quat[0] = buf[m++];
-      quat[1] = buf[m++];
-      quat[2] = buf[m++];
-      quat[3] = buf[m++];
-      inertia[0] = buf[m++];
-      inertia[1] = buf[m++];
-      inertia[2] = buf[m++];
-      pole1[0] = buf[m++];
-      pole1[1] = buf[m++];
-      pole1[2] = buf[m++];
-      pole2[0] = buf[m++];
-      pole2[1] = buf[m++];
-      pole2[2] = buf[m++];
-      bonus[j].length = buf[m++];
-      bonus[j].diameter = buf[m++];
-      bonus[j].ilocal = i;
-      bacillus[i] = j;
-      nghost_bonus++;
-    }
-    v[i][0] = buf[m++];
-    v[i][1] = buf[m++];
-    v[i][2] = buf[m++];
-    angmom[i][0] = buf[m++];
-    angmom[i][1] = buf[m++];
-    angmom[i][2] = buf[m++];
-  }
-
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->
-        unpack_border(n,first,&buf[m]);
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecBacillus::unpack_border_hybrid(int n, int first, double *buf)
-{
-  int i,j,m,last;
-  double *quat,*inertia,*pole1,*pole2;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    bacillus[i] = (int) ubuf(buf[m++]).i;
-    if (bacillus[i] == 0) bacillus[i] = -1;
-    else {
-      j = nlocal_bonus + nghost_bonus;
-      if (j == nmax_bonus) grow_bonus();
-      quat = bonus[j].quat;
-      inertia = bonus[j].inertia;
-      pole1 = bonus[j].pole1;
-      pole2 = bonus[j].pole2;
-      quat[0] = buf[m++];
-      quat[1] = buf[m++];
-      quat[2] = buf[m++];
-      quat[3] = buf[m++];
-      inertia[0] = buf[m++];
-      inertia[1] = buf[m++];
-      inertia[2] = buf[m++];
-      pole1[0] = buf[m++];
-      pole1[1] = buf[m++];
-      pole1[2] = buf[m++];
-      pole2[0] = buf[m++];
-      pole2[1] = buf[m++];
-      pole2[2] = buf[m++];
-      bonus[j].length = buf[m++];
-      bonus[j].diameter = buf[m++];
-      bonus[j].ilocal = i;
-      bacillus[i] = j;
-      nghost_bonus++;
-    }
-  }
   return m;
 }
 
@@ -973,25 +330,9 @@ int AtomVecBacillus::unpack_border_hybrid(int n, int first, double *buf)
    xyz must be 1st 3 values, so comm::exchange() can test on them
 ------------------------------------------------------------------------- */
 
-int AtomVecBacillus::pack_exchange(int i, double *buf)
+int AtomVecBacillus::pack_exchange_bonus(int i, double *buf)
 {
-  int m = 1;
-  buf[m++] = x[i][0];
-  buf[m++] = x[i][1];
-  buf[m++] = x[i][2];
-  buf[m++] = v[i][0];
-  buf[m++] = v[i][1];
-  buf[m++] = v[i][2];
-  buf[m++] = ubuf(tag[i]).d;
-  buf[m++] = ubuf(type[i]).d;
-  buf[m++] = ubuf(mask[i]).d;
-  buf[m++] = ubuf(image[i]).d;
-  buf[m++] = radius[i];
-  buf[m++] = rmass[i];
-  buf[m++] = biomass[i];
-  buf[m++] = angmom[i][0];
-  buf[m++] = angmom[i][1];
-  buf[m++] = angmom[i][2];
+  int m = 0;
 
   if (bacillus[i] < 0) buf[m++] = ubuf(0).d;
   else {
@@ -1018,41 +359,17 @@ int AtomVecBacillus::pack_exchange(int i, double *buf)
     buf[m++] = bonus[j].diameter;
   }
 
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      m += modify->fix[atom->extra_grow[iextra]]->pack_exchange(i,&buf[m]);
-
-  buf[0] = m;
   return m;
 }
 
 /* ---------------------------------------------------------------------- */
 
-int AtomVecBacillus::unpack_exchange(double *buf)
+int AtomVecBacillus::unpack_exchange_bonus(int ilocal, double *buf)
 {
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) grow(0);
+  int m = 0;
 
-  int m = 1;
-  x[nlocal][0] = buf[m++];
-  x[nlocal][1] = buf[m++];
-  x[nlocal][2] = buf[m++];
-  v[nlocal][0] = buf[m++];
-  v[nlocal][1] = buf[m++];
-  v[nlocal][2] = buf[m++];
-  tag[nlocal] = (tagint) ubuf(buf[m++]).i;
-  type[nlocal] = (int) ubuf(buf[m++]).i;
-  mask[nlocal] = (int) ubuf(buf[m++]).i;
-  image[nlocal] = (imageint) ubuf(buf[m++]).i;
-  radius[nlocal] = buf[m++];
-  rmass[nlocal] = buf[m++];
-  biomass[nlocal] = buf[m++];
-  angmom[nlocal][0] = buf[m++];
-  angmom[nlocal][1] = buf[m++];
-  angmom[nlocal][2] = buf[m++];
-
-  bacillus[nlocal] = (int) ubuf(buf[m++]).i;
-  if (bacillus[nlocal] == 0) bacillus[nlocal] = -1;
+  bacillus[ilocal] = (int) ubuf(buf[m++]).i;
+  if (bacillus[ilocal] == 0) bacillus[ilocal] = -1;
   else {
     if (nlocal_bonus == nmax_bonus) grow_bonus();
     double *quat = bonus[nlocal_bonus].quat;
@@ -1074,16 +391,11 @@ int AtomVecBacillus::unpack_exchange(double *buf)
     pole2[2] = buf[m++];
     bonus[nlocal_bonus].length = buf[m++];
     bonus[nlocal_bonus].diameter = buf[m++];
-    bonus[nlocal_bonus].ilocal = nlocal;
-    bacillus[nlocal] = nlocal_bonus++;
+
+    bonus[nlocal_bonus].ilocal = ilocal;
+    bacillus[ilocal] = nlocal_bonus++;
   }
 
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      m += modify->fix[atom->extra_grow[iextra]]->
-        unpack_exchange(nlocal,&buf[m]);
-
-  atom->nlocal++;
   return m;
 }
 
@@ -1092,50 +404,29 @@ int AtomVecBacillus::unpack_exchange(double *buf)
    include extra data stored by fixes
 ------------------------------------------------------------------------- */
 
-int AtomVecBacillus::size_restart()
+int AtomVecBacillus::size_restart_bonus()
 {
   int i;
 
   int n = 0;
   int nlocal = atom->nlocal;
-  for (i = 0; i < nlocal; i++)
-    if (bacillus[i] >= 0) n += 33;
-    else n += 18;
-
-  if (atom->nextra_restart)
-    for (int iextra = 0; iextra < atom->nextra_restart; iextra++)
-      for (i = 0; i < nlocal; i++)
-        n += modify->fix[atom->extra_restart[iextra]]->size_restart(i);
+  for (i = 0; i < nlocal; i++) {
+    if (bacillus[i] >= 0) n += size_restart_bonus_one;
+    else n++;
+  }
 
   return n;
 }
 
 /* ----------------------------------------------------------------------
-   pack atom I's data for restart file including extra quantities
+   pack atom I's data for restart file including bonus data
    xyz must be 1st 3 values, so that read_restart can test on them
    molecular types may be negative, but write as positive
 ------------------------------------------------------------------------- */
 
-int AtomVecBacillus::pack_restart(int i, double *buf)
+int AtomVecBacillus::pack_restart_bonus(int i, double *buf)
 {
-  int m = 1;
-  buf[m++] = x[i][0];
-  buf[m++] = x[i][1];
-  buf[m++] = x[i][2];
-  buf[m++] = ubuf(tag[i]).d;
-  buf[m++] = ubuf(type[i]).d;
-  buf[m++] = ubuf(mask[i]).d;
-  buf[m++] = ubuf(image[i]).d;
-  buf[m++] = v[i][0];
-  buf[m++] = v[i][1];
-  buf[m++] = v[i][2];
-
-  buf[m++] = radius[i];
-  buf[m++] = rmass[i];
-  buf[m++] = biomass[i];
-  buf[m++] = angmom[i][0];
-  buf[m++] = angmom[i][1];
-  buf[m++] = angmom[i][2];
+  int m = 0;
 
   if (bacillus[i] < 0) buf[m++] = ubuf(0).d;
   else {
@@ -1162,48 +453,19 @@ int AtomVecBacillus::pack_restart(int i, double *buf)
     buf[m++] = bonus[j].diameter;
   }
 
-  if (atom->nextra_restart)
-    for (int iextra = 0; iextra < atom->nextra_restart; iextra++)
-      m += modify->fix[atom->extra_restart[iextra]]->pack_restart(i,&buf[m]);
-
-  buf[0] = m;
   return m;
 }
 
 /* ----------------------------------------------------------------------
-   unpack data for one atom from restart file including extra quantities
+   unpack data for one atom from restart file including bonus data
 ------------------------------------------------------------------------- */
 
-int AtomVecBacillus::unpack_restart(double *buf)
+int AtomVecBacillus::unpack_restart_bonus(int ilocal, double *buf)
 {
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) {
-    grow(0);
-    if (atom->nextra_store)
-      memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
-  }
+  int m = 0;
 
-  int m = 1;
-  x[nlocal][0] = buf[m++];
-  x[nlocal][1] = buf[m++];
-  x[nlocal][2] = buf[m++];
-  tag[nlocal] = (tagint) ubuf(buf[m++]).i;
-  type[nlocal] = (int) ubuf(buf[m++]).i;
-  mask[nlocal] = (int) ubuf(buf[m++]).i;
-  image[nlocal] = (imageint) ubuf(buf[m++]).i;
-  v[nlocal][0] = buf[m++];
-  v[nlocal][1] = buf[m++];
-  v[nlocal][2] = buf[m++];
-
-  radius[nlocal] = buf[m++];
-  rmass[nlocal] = buf[m++];
-  biomass[nlocal] = buf[m++];
-  angmom[nlocal][0] = buf[m++];
-  angmom[nlocal][1] = buf[m++];
-  angmom[nlocal][2] = buf[m++];
-
-  bacillus[nlocal] = (int) ubuf(buf[m++]).i;
-  if (bacillus[nlocal] == 0) bacillus[nlocal] = -1;
+  bacillus[ilocal] = (int) ubuf(buf[m++]).i;
+  if (bacillus[ilocal] == 0) bacillus[ilocal] = -1;
   else {
     if (nlocal_bonus == nmax_bonus) grow_bonus();
     double *quat = bonus[nlocal_bonus].quat;
@@ -1225,150 +487,39 @@ int AtomVecBacillus::unpack_restart(double *buf)
     pole2[2] = buf[m++];
     bonus[nlocal_bonus].length = buf[m++];
     bonus[nlocal_bonus].diameter = buf[m++];
-    bonus[nlocal_bonus].ilocal = nlocal;
-    bacillus[nlocal] = nlocal_bonus++;
+    bonus[nlocal_bonus].ilocal = ilocal;
+    bacillus[ilocal] = nlocal_bonus++;
   }
 
-  double **extra = atom->extra;
-  if (atom->nextra_store) {
-    int size = static_cast<int> (buf[0]) - m;
-    for (int i = 0; i < size; i++) extra[nlocal][i] = buf[m++];
-  }
-
-  atom->nlocal++;
   return m;
 }
 
 /* ----------------------------------------------------------------------
-   create one atom of itype at coord
-   set other values to defaults
-------------------------------------------------------------------------- */
-
-void AtomVecBacillus::create_atom(int itype, double *coord)
-{
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) grow(0);
-
-  tag[nlocal] = 0;
-  type[nlocal] = itype;
-  x[nlocal][0] = coord[0];
-  x[nlocal][1] = coord[1];
-  x[nlocal][2] = coord[2];
-  mask[nlocal] = 1;
-  image[nlocal] = ((imageint) IMGMAX << IMG2BITS) |
-    ((imageint) IMGMAX << IMGBITS) | IMGMAX;
-  v[nlocal][0] = 0.0;
-  v[nlocal][1] = 0.0;
-  v[nlocal][2] = 0.0;
-
-  radius[nlocal] = 0.5e-6;
-  rmass[nlocal] = 1.0;
-  biomass[nlocal] = 1.0;
-  angmom[nlocal][0] = 0.0;
-  angmom[nlocal][1] = 0.0;
-  angmom[nlocal][2] = 0.0;
-  bacillus[nlocal] = -1;
-
-  atom->nlocal++;
-}
-
-/* ----------------------------------------------------------------------
-   unpack one line from Atoms section of data file
-   initialize other atom quantities
-------------------------------------------------------------------------- */
-
-void AtomVecBacillus::data_atom(double *coord, imageint imagetmp, char **values)
-{
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) grow(0);
-
-  tag[nlocal] = ATOTAGINT(values[0]);
-  type[nlocal] = atoi(values[1]);
-  if (type[nlocal] <= 0 || type[nlocal] > atom->ntypes)
-    error->one(FLERR,"Invalid atom type in Atoms section of data file");
-
-  bacillus[nlocal] = atoi(values[2]);
-  if (bacillus[nlocal] == 0) bacillus[nlocal] = -1;
-  else if (bacillus[nlocal] == 1) bacillus[nlocal] = 0;
-  else error->one(FLERR,"Invalid bacillusflag in Atoms section of data file");
-  // use density to set mass here, correct later if bonus is defined
-  rmass[nlocal] = atof(values[3]);
-  if (rmass[nlocal] <= 0.0)
-    error->one(FLERR,"Density must be greater than 0");
-
-  x[nlocal][0] = coord[0];
-  x[nlocal][1] = coord[1];
-  x[nlocal][2] = coord[2];
-
-  image[nlocal] = imagetmp;
-
-  mask[nlocal] = 1;
-  v[nlocal][0] = 0.0;
-  v[nlocal][1] = 0.0;
-  v[nlocal][2] = 0.0;
-  angmom[nlocal][0] = 0.0;
-  angmom[nlocal][1] = 0.0;
-  angmom[nlocal][2] = 0.0;
-  radius[nlocal] = 0.0;
-
-  double ratio = atof(values[7]);
-  if (ratio < 0 || ratio > 1)
-    error->one(FLERR,"Biomass/Mass (dry/wet weight) ratio must be between 0-1");
-  biomass[nlocal] = ratio;
-
-  atom->nlocal++;
-}
-
-/* ----------------------------------------------------------------------
-   unpack hybrid quantities from one line in Atoms section of data file
-   initialize other atom quantities for this sub-style
-------------------------------------------------------------------------- */
-
-int AtomVecBacillus::data_atom_hybrid(int nlocal, char **values)
-{
-  bacillus[nlocal] = atoi(values[0]);
-  if (bacillus[nlocal] == 0) bacillus[nlocal] = -1;
-  else if (bacillus[nlocal] == 1) bacillus[nlocal] = 0;
-  else error->one(FLERR,"Invalid atom type in Atoms section of data file");
-
-  rmass[nlocal] = atof(values[1]);
-  if (rmass[nlocal] <= 0.0)
-    error->one(FLERR,"Invalid density in Atoms section of data file");
-
-  double ratio = atof(values[2]);
-  if (ratio < 0 || ratio > 1)
-    error->one(FLERR,"Biomass/Mass (dry/wet weight) ratio must be between 0-1");
-  biomass[nlocal] = ratio;
-
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   unpack one body from Bacilli section of data file
+   unpack one line from Bacilli section of data file
 ------------------------------------------------------------------------- */
 
 void AtomVecBacillus::data_atom_bonus(int m, char **values)
 {
   if (bacillus[m])
-    error->one(FLERR,"Assigning bacillus parameters to non-bacillus atom");
+    error->one(FLERR,"Assigning bacillus parameters to non-ellipsoid atom");
 
   if (nlocal_bonus == nmax_bonus) grow_bonus();
 
   // diagonalize inertia tensor
 
   double tensor[3][3];
-  tensor[0][0] = atof(values[0]);
-  tensor[1][1] = atof(values[1]);
-  tensor[2][2] = atof(values[2]);
-  tensor[0][1] = tensor[1][0] = atof(values[3]);
-  tensor[0][2] = tensor[2][0] = atof(values[4]);
-  tensor[1][2] = tensor[2][1] = atof(values[5]);
+  tensor[0][0] = utils::numeric(FLERR,values[0],true,lmp);
+  tensor[1][1] = utils::numeric(FLERR,values[1],true,lmp);
+  tensor[2][2] = utils::numeric(FLERR,values[2],true,lmp);
+  tensor[0][1] = tensor[1][0] = utils::numeric(FLERR,values[3],true,lmp);
+  tensor[0][2] = tensor[2][0] = utils::numeric(FLERR,values[4],true,lmp);
+  tensor[1][2] = tensor[2][1] = utils::numeric(FLERR,values[5],true,lmp);
 
   double *inertia = bonus[nlocal_bonus].inertia;
   double evectors[3][3];
-  int ierror = MathExtra::jacobi(tensor,inertia,evectors);
+  int ierror = MathEigen::jacobi3(tensor,inertia,evectors);
   if (ierror) error->one(FLERR,
-                         "Insufficient Jacobi rotations for baccilus");
+                         "Insufficient Jacobi rotations for bacillus");
 
   // if any principal moment < scaled EPSILON, set to 0.0
   double max;
@@ -1378,7 +529,6 @@ void AtomVecBacillus::data_atom_bonus(int m, char **values)
   if (inertia[0] < EPSILON * max) inertia[0] = 0.0;
   if (inertia[1] < EPSILON * max) inertia[1] = 0.0;
   if (inertia[2] < EPSILON * max) inertia[2] = 0.0;
-  //printf("i1=%e i2=%e i3=%e cut=%e \n", inertia[0],inertia[1],inertia[2],  EPSILON * max);
 
   // exyz_space = principal axes in space frame
   double ex_space[3],ey_space[3],ez_space[3];
@@ -1402,11 +552,12 @@ void AtomVecBacillus::data_atom_bonus(int m, char **values)
   // create initial quaternion
   MathExtra::exyz_to_q(ex_space,ey_space,ez_space,bonus[nlocal_bonus].quat);
 
+  // initialise cooridnates os two cell poles
   double *pole1 = bonus[nlocal_bonus].pole1;
   double *pole2 = bonus[nlocal_bonus].pole2;
-  double px = atof(values[6]);
-  double py = atof(values[7]);
-  double pz = atof(values[8]);
+  double px = utils::numeric(FLERR,values[6],true,lmp);
+  double py = utils::numeric(FLERR,values[7],true,lmp);
+  double pz = utils::numeric(FLERR,values[8],true,lmp);
 
   pole1[0] = px;
   pole1[1] = py;
@@ -1420,182 +571,162 @@ void AtomVecBacillus::data_atom_bonus(int m, char **values)
   pole2[1] = -py;
   pole2[2] = -pz;
 
-  bonus[nlocal_bonus].diameter = atof(values[9]);
+  bonus[nlocal_bonus].diameter = utils::numeric(FLERR,values[9],true,lmp);
   if (bonus[nlocal_bonus].diameter < 0)
     error->one(FLERR, "Invalid diameter in Bacilli section of data file: diameter < 0");
-  atom->radius[m] = bonus[nlocal_bonus].diameter * 0.5;
+  radius[m] = bonus[nlocal_bonus].diameter * 0.5;
 
-  // reset ellipsoid mass
+  // reset bacillus mass
   // previously stored density in rmass
-  rmass[m] *= (4.0*MY_PI/3.0*
-      atom->radius[m]*atom->radius[m]*atom->radius[m] +
-      MY_PI*atom->radius[m]*atom->radius[m]*bonus[nlocal_bonus].length);
-  biomass[m] = rmass[m] * biomass[m];
+  if (radius[m] > 0.0)
+  rmass[m] *= (4.0*MY_PI/3.0*radius[m]*radius[m]*radius[m] +
+      MY_PI*radius[m]*radius[m]*bonus[nlocal_bonus].length);
+
+  if (biomass[m] < 0 || biomass[m] > 1)
+    error->one(FLERR,"Biomass/Mass (dry/wet weight) ratio must be between 0-1");
+  biomass[m] *= rmass[m];
 
   bonus[nlocal_bonus].ilocal = m;
   bacillus[m] = nlocal_bonus++;
 }
 
 /* ----------------------------------------------------------------------
-   unpack one tri from Velocities section of data file
+   return # of bytes of allocated bonus memory
 ------------------------------------------------------------------------- */
 
-void AtomVecBacillus::data_vel(int m, char **values)
+double AtomVecBacillus::memory_usage_bonus()
 {
-  v[m][0] = atof(values[0]);
-  v[m][1] = atof(values[1]);
-  v[m][2] = atof(values[2]);
-  angmom[m][0] = atof(values[3]);
-  angmom[m][1] = atof(values[4]);
-  angmom[m][2] = atof(values[5]);
+  double bytes = 0;
+  bytes += nmax_bonus*sizeof(Bonus);
+  return bytes;
 }
 
 /* ----------------------------------------------------------------------
-   unpack hybrid quantities from one body in Velocities section of data file
+   create one atom of itype at coord
+   set other values to defaults
 ------------------------------------------------------------------------- */
 
-int AtomVecBacillus::data_vel_hybrid(int m, char **values)
+void AtomVecBacillus::create_atom_post(int ilocal)
 {
-  angmom[m][0] = atof(values[0]);
-  angmom[m][1] = atof(values[1]);
-  angmom[m][2] = atof(values[2]);
-  return 3;
+  radius[ilocal] = 0.5e-6;
+  rmass[ilocal] *= (4.0*MY_PI/3.0*
+      radius[ilocal]*radius[ilocal]*radius[ilocal] +
+      MY_PI*radius[ilocal]*radius[ilocal]*bonus[nlocal_bonus].length);
+  biomass[ilocal] = rmass[ilocal];
+  bacillus[ilocal] = -1;
 }
 
 /* ----------------------------------------------------------------------
-   pack atom info for data file including 3 image flags
+   modify what AtomVec::data_atom() just unpacked
+   or initialize other atom quantities
 ------------------------------------------------------------------------- */
 
-void AtomVecBacillus::pack_data(double **buf)
+void AtomVecBacillus::data_atom_post(int ilocal)
 {
+  bacillus_flag = bacillus[ilocal];
+  if (bacillus_flag == 0) bacillus_flag = -1;
+  else if (bacillus_flag == 1) bacillus_flag = 0;
+  else error->one(FLERR,"Invalid bacillus flag in Atoms section of data file");
+  bacillus[ilocal] = bacillus_flag;
+
+  if (rmass[ilocal] <= 0.0)
+    error->one(FLERR,"Invalid density in Atoms section of data file");
+
+  angmom[ilocal][0] = 0.0;
+  angmom[ilocal][1] = 0.0;
+  angmom[ilocal][2] = 0.0;
+}
+
+/* ----------------------------------------------------------------------
+   modify values for AtomVec::pack_data() to pack
+------------------------------------------------------------------------- */
+
+void AtomVecBacillus::pack_data_pre(int ilocal)
+{
+  bacillus_flag = atom->bacillus[ilocal];
+  rmass_one = atom->rmass[ilocal];
+
+  if (bacillus_flag < 0) bacillus[ilocal] = 0;
+  else bacillus[ilocal] = 1;
+
+  if (bacillus_flag >= 0)
+    rmass[ilocal] /= (4.0*MY_PI/3.0*radius[ilocal]*radius[ilocal]*radius[ilocal] +
+	      MY_PI*radius[ilocal]*radius[ilocal]*bonus[bacillus[ilocal]].length);
+
+  biomass_one = biomass[ilocal];
+  biomass[ilocal] /= rmass_one;
+}
+
+/* ----------------------------------------------------------------------
+   unmodify values packed by AtomVec::pack_data()
+------------------------------------------------------------------------- */
+
+void AtomVecBacillus::pack_data_post(int ilocal)
+{
+  bacillus[ilocal] = bacillus_flag;
+  rmass[ilocal] = rmass_one;
+  biomass[ilocal] = biomass_one;
+}
+
+/* ----------------------------------------------------------------------
+   pack bonus bacillus info for writing to data file
+   if buf is nullptr, just return buffer size
+------------------------------------------------------------------------- */
+
+int AtomVecBacillus::pack_data_bonus(double *buf, int /*flag*/)
+{
+  int i,j,m;
+  double p[3][3],pdiag[3][3],ispace[3][3];
+  double *pole1 = bonus->pole1;
+  double *inertia = bonus->inertia;
+  double *quat = bonus->quat;
+
+  tagint *tag = atom->tag;
   int nlocal = atom->nlocal;
-  for (int i = 0; i < nlocal; i++) {
-    buf[i][0] = ubuf(tag[i]).d;
-    buf[i][1] = ubuf(type[i]).d;
-    if (bacillus[i] < 0) buf[i][2] = ubuf(0).d;
-    else buf[i][2] = ubuf(1).d;
-    if (bacillus[i] < 0) buf[i][3] = rmass[i];
-    else buf[i][3] = rmass[i] / (4.0*MY_PI/3.0*
-	      atom->radius[i]*atom->radius[i]*atom->radius[i] +
-	      MY_PI*atom->radius[i]*atom->radius[i]*bonus[bacillus[i]].length);
-    buf[i][4] = x[i][0];
-    buf[i][5] = x[i][1];
-    buf[i][6] = x[i][2];
-    buf[i][7] = biomass[i] / rmass[i];
-    buf[i][8] = ubuf((image[i] & IMGMASK) - IMGMAX).d;
-    buf[i][9] = ubuf((image[i] >> IMGBITS & IMGMASK) - IMGMAX).d;
-    buf[i][10] = ubuf((image[i] >> IMG2BITS) - IMGMAX).d;
+
+  m = 0;
+  for (i = 0; i < nlocal; i++) {
+    if (bacillus[i] < 0) continue;
+    if (buf) {
+      buf[m++] = ubuf(tag[i]).d;
+      j = bacillus[i];
+      // 6 moments of inertia
+
+      MathExtra::quat_to_mat(quat,p);
+      MathExtra::times3_diag(p,inertia,pdiag);
+      MathExtra::times3_transpose(pdiag,p,ispace);
+
+      buf[m++] = ispace[0][0];
+      buf[m++] = ispace[1][1];
+      buf[m++] = ispace[2][2];
+      buf[m++] = ispace[0][1];
+      buf[m++] = ispace[0][2];
+      buf[m++] = ispace[1][2];
+
+      buf[m++] = pole1[0];
+      buf[m++] = pole1[1];
+      buf[m++] = pole1[2];
+
+      buf[m++] = bonus->length;
+    } else m += size_data_bonus;
   }
+
+  return m;
 }
 
 /* ----------------------------------------------------------------------
-   pack hybrid atom info for data file
+   write bonus bacillus info to data file
 ------------------------------------------------------------------------- */
 
-int AtomVecBacillus::pack_data_hybrid(int i, double *buf)
+void AtomVecBacillus::write_data_bonus(FILE *fp, int n, double *buf, int /*flag*/)
 {
-  if (bacillus[i] < 0) buf[0] = ubuf(0).d;
-  else buf[0] = ubuf(1).d;
-  if (bacillus[i] < 0) buf[1] = rmass[i];
-  else buf[1] = rmass[i] / (4.0*MY_PI/3.0*
-      atom->radius[i]*atom->radius[i]*atom->radius[i] +
-      MY_PI*atom->radius[i]*atom->radius[i]*bonus[bacillus[i]].length);
-
-  buf[2] = biomass[i] / rmass[i];
-
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   write atom info to data file including 3 image flags
-------------------------------------------------------------------------- */
-
-void AtomVecBacillus::write_data(FILE *fp, int n, double **buf)
-{
-  for (int i = 0; i < n; i++)
-    fprintf(fp,TAGINT_FORMAT
-            " %d %d %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e %d %d %d\n",
-            (tagint) ubuf(buf[i][0]).i,(int) ubuf(buf[i][1]).i,
-            (int) ubuf(buf[i][2]).i,
-            buf[i][3],buf[i][4],buf[i][5],buf[i][6],buf[i][7],
-            (int) ubuf(buf[i][8]).i,(int) ubuf(buf[i][9]).i,
-            (int) ubuf(buf[i][10]).i);
-}
-
-/* ----------------------------------------------------------------------
-   write hybrid atom info to data file
-------------------------------------------------------------------------- */
-
-int AtomVecBacillus::write_data_hybrid(FILE *fp, double *buf)
-{
-  fprintf(fp," %d %-1.16e %-1.16e",(int) ubuf(buf[0]).i,buf[1],buf[2]);
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   pack velocity info for data file
-------------------------------------------------------------------------- */
-
-void AtomVecBacillus::pack_vel(double **buf)
-{
-  int nlocal = atom->nlocal;
-  for (int i = 0; i < nlocal; i++) {
-    buf[i][0] = ubuf(tag[i]).d;
-    buf[i][1] = v[i][0];
-    buf[i][2] = v[i][1];
-    buf[i][3] = v[i][2];
-    buf[i][4] = angmom[i][0];
-    buf[i][5] = angmom[i][1];
-    buf[i][6] = angmom[i][2];
+  int i = 0;
+  while (i < n) {
+    fmt::print(fp,"{} {} {} {} {} {} {} {} {} {} {}\n",ubuf(buf[i]).i,
+	       buf[i+1],buf[i+2],buf[i+3],buf[i+4],buf[i+5],buf[i+6],buf[i+7],
+	       buf[i+8],buf[i+9],buf[i+10]);
+    i += size_data_bonus;
   }
-}
-
-/* ----------------------------------------------------------------------
-   pack hybrid velocity info for data file
-------------------------------------------------------------------------- */
-
-int AtomVecBacillus::pack_vel_hybrid(int i, double *buf)
-{
-  buf[0] = angmom[i][0];
-  buf[1] = angmom[i][1];
-  buf[2] = angmom[i][2];
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   write velocity info to data file
-------------------------------------------------------------------------- */
-
-void AtomVecBacillus::write_vel(FILE *fp, int n, double **buf)
-{
-  for (int i = 0; i < n; i++)
-    fprintf(fp,TAGINT_FORMAT
-            " %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e\n",
-            (tagint) ubuf(buf[i][0]).i,buf[i][1],buf[i][2],buf[i][3],
-            buf[i][4],buf[i][5],buf[i][6]);
-}
-
-/* ----------------------------------------------------------------------
-   write hybrid velocity info to data file
-------------------------------------------------------------------------- */
-
-int AtomVecBacillus::write_vel_hybrid(FILE *fp, double *buf)
-{
-  fprintf(fp," %-1.16e %-1.16e %-1.16e",buf[0],buf[1],buf[2]);
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   reset quat orientation for atom M to quat_external
-   called by Atom:add_molecule_atom()
-------------------------------------------------------------------------- */
-
-void AtomVecBacillus::set_quat(int m, double *quat_external)
-{
-  if (bacillus[m] < 0) error->one(FLERR,"Assigning quat to non-bacillus atom");
-  double *quat = bonus[bacillus[m]].quat;
-  quat[0] = quat_external[0]; quat[1] = quat_external[1];
-  quat[2] = quat_external[2]; quat[3] = quat_external[3];
 }
 
 /* ----------------------------------------------------------------------
@@ -1657,44 +788,7 @@ void AtomVecBacillus::get_pole_coords(int m, double *xp1, double *xp2)
   xp2[0] += x[0];
   xp2[1] += x[1];
   xp2[2] += x[2];
-//
-//  if (shift > 0) {
-//    double dl = 2*shift/bonus[bacillus[m]].length;
-//    xp1[0] += (xp1[0] - x[0]) * dl;
-//    xp1[1] += (xp1[1] - x[1]) * dl;
-//    xp1[2] += (xp1[2] - x[2]) * dl;
-//    xp2[0] += (xp2[0] - x[0]) * dl;
-//    xp2[1] += (xp2[1] - x[1]) * dl;
-//    xp2[2] += (xp2[2] - x[2]) * dl;
-//  }
-}
-
-
-/* ----------------------------------------------------------------------
-   return # of bytes of allocated memory
-------------------------------------------------------------------------- */
-
-bigint AtomVecBacillus::memory_usage()
-{
-  bigint bytes = 0;
-
-  if (atom->memcheck("tag")) bytes += memory->usage(tag,nmax);
-  if (atom->memcheck("type")) bytes += memory->usage(type,nmax);
-  if (atom->memcheck("mask")) bytes += memory->usage(mask,nmax);
-  if (atom->memcheck("image")) bytes += memory->usage(image,nmax);
-  if (atom->memcheck("x")) bytes += memory->usage(x,nmax,3);
-  if (atom->memcheck("v")) bytes += memory->usage(v,nmax,3);
-  if (atom->memcheck("f")) bytes += memory->usage(f,nmax*comm->nthreads,3);
-
-  if (atom->memcheck("radius")) bytes += memory->usage(radius,nmax);
-  if (atom->memcheck("rmass")) bytes += memory->usage(rmass,nmax);
-  if (atom->memcheck("biomass")) bytes += memory->usage(biomass,nmax);
-  if (atom->memcheck("angmom")) bytes += memory->usage(angmom,nmax,3);
-  if (atom->memcheck("torque")) bytes +=
-                                  memory->usage(torque,nmax*comm->nthreads,3);
-  if (atom->memcheck("bacillus")) bytes += memory->usage(bacillus,nmax);
-
-  bytes += nmax_bonus*sizeof(Bonus);
-
-  return bytes;
+//  printf("after %e %e %e %e\n", xp1[2],  xp2[2], bonus[bacillus[m]].pole1[2], bonus[bacillus[m]].pole2[2]);
+//  printf("!!%e %e %e %e\n", bonus[bacillus[m]].quat[0],bonus[bacillus[m]].quat[1]
+//			   ,bonus[bacillus[m]].quat[2],bonus[bacillus[m]].quat[3]);
 }

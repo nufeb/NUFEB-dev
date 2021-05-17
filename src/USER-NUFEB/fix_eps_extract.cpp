@@ -18,7 +18,6 @@
 #include "atom.h"
 #include "atom_vec.h"
 #include "error.h"
-#include "force.h"
 #include "math_const.h"
 #include "random_park.h"
 #include "modify.h"
@@ -43,13 +42,13 @@ FixEPSExtract::FixEPSExtract(LAMMPS *lmp, int narg, char **arg) :
 
   compute_flag = 1;
   
-  type = force->inumeric(FLERR, arg[3]);
+  type = utils::inumeric(FLERR,arg[3],true,lmp);
   ieps = group->find(arg[4]);
   if (ieps < 0)
     error->all(FLERR, "Can't find group");
-  ratio = force->numeric(FLERR, arg[5]);
-  density = force->numeric(FLERR, arg[6]);
-  seed = force->inumeric(FLERR, arg[7]);
+  ratio = utils::numeric(FLERR,arg[5],true,lmp);
+  density = utils::numeric(FLERR,arg[6],true,lmp);
+  seed = utils::inumeric(FLERR,arg[7],true,lmp);
 
   // Random number generator, same for all procs
   random = new RanPark(lmp, seed);

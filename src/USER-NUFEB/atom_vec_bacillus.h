@@ -39,75 +39,53 @@ class AtomVecBacillus : public AtomVec {
 
   AtomVecBacillus(class LAMMPS *);
   ~AtomVecBacillus();
-  void grow(int);
-  void grow_reset();
-  void copy(int, int, int);
-  int pack_comm(int, int *, double *, int, int *);
-  int pack_comm_vel(int, int *, double *, int, int *);
-  int pack_comm_hybrid(int, int *, double *);
-  void unpack_comm(int, int, double *);
-  void unpack_comm_vel(int, int, double *);
-  int unpack_comm_hybrid(int, int, double *);
-  int pack_reverse(int, int, double *);
-  int pack_reverse_hybrid(int, int, double *);
-  void unpack_reverse(int, int *, double *);
-  int unpack_reverse_hybrid(int, int *, double *);
-  int pack_border(int, int *, double *, int, int *);
-  int pack_border_vel(int, int *, double *, int, int *);
-  int pack_border_hybrid(int, int *, double *);
-  void unpack_border(int, int, double *);
-  void unpack_border_vel(int, int, double *);
-  int unpack_border_hybrid(int, int, double *);
-  int pack_exchange(int, double *);
-  int unpack_exchange(double *);
-  int size_restart();
-  int pack_restart(int, double *);
-  int unpack_restart(double *);
-  void create_atom(int, double *);
-  void data_atom(double *, imageint, char **);
-  int data_atom_hybrid(int, char **);
-  void data_vel(int, char **);
-  int data_vel_hybrid(int, char **);
-  void pack_data(double **);
-  int pack_data_hybrid(int, double *);
-  void write_data(FILE *, int, double **);
-  int write_data_hybrid(FILE *, double *);
-  void pack_vel(double **);
-  int pack_vel_hybrid(int, double *);
-  void write_vel(FILE *, int, double **);
-  int write_vel_hybrid(FILE *, double *);
-  bigint memory_usage();
+  void process_args(int, char **);
+  void init();
 
-  // manipulate Bonus data structure for extra atom info
-
+  void grow_pointers();
+  void copy_bonus(int, int, int);
   void clear_bonus();
+  int pack_comm_bonus(int, int *, double *);
+  void unpack_comm_bonus(int, int, double *);
+  int pack_border_bonus(int, int *, double *);
+  int unpack_border_bonus(int, int, double *);
+  int pack_exchange_bonus(int, double *);
+  int unpack_exchange_bonus(int, double *);
+  int size_restart_bonus();
+  int pack_restart_bonus(int, double *);
+  int unpack_restart_bonus(int, double *);
   void data_atom_bonus(int, char **);
-  void get_pole_coords(int, double *, double *);
+  double memory_usage_bonus();
+
+  void create_atom_post(int);
+  void data_atom_post(int);
+  void pack_data_pre(int);
+  void pack_data_post(int);
+
+  int pack_data_bonus(double *, int);
+  void write_data_bonus(FILE *, int, double *, int);
 
   // methods used by other classes to query/set bacillus info
 
-  double radius_bacillus(int, int, int *, double *);
-  void set_quat(int, double *);
+  void get_pole_coords(int, double *, double *);
   void set_bonus(int, double *, double, double *, double *);
-  void image_data(int, double *&, double *&);
 
   int nlocal_bonus;
 
  private:
-  tagint *tag;
-  int *type,*mask;
-  imageint *image;
-  double **x,**v,**f;
-  double *radius;
-  double *rmass;
-  double *biomass;
-  double **angmom,**torque;
   int *bacillus;
+  double *rmass,*radius;
+  double *biomass;
+  double **angmom;
 
   int nghost_bonus,nmax_bonus;
+  int bacillus_flag;
+
+  int radvary;
+  double rmass_one, biomass_one;
 
   void grow_bonus();
-  void copy_bonus(int, int);
+  void copy_bonus_all(int, int);
 };
 
 }

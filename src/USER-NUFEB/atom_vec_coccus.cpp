@@ -13,21 +13,14 @@
 
 #include "atom_vec_coccus.h"
 
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
 #include "atom.h"
-#include "comm.h"
-#include "domain.h"
-#include "modify.h"
-#include "force.h"
+#include "error.h"
 #include "fix.h"
 #include "fix_adapt.h"
 #include "math_const.h"
-#include "memory.h"
-#include "error.h"
+#include "modify.h"
 
-#include "group.h"
+#include <cstring>
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
@@ -36,23 +29,61 @@ using namespace MathConst;
 
 AtomVecCoccus::AtomVecCoccus(LAMMPS *lmp) : AtomVec(lmp)
 {
-  molecular = 0;
-  radvary = 1;
+  mass_type = PER_ATOM;
+  molecular = Atom::ATOMIC;
 
-  comm_x_only = 0;
-  comm_f_only = 0;
-  size_forward = 8;
-  size_reverse = 6;
-  size_border = 11;
-  size_velocity = 6;
-  size_data_atom = 9;
-  size_data_vel = 7;
-  xcol_data = 5;
-
+  atom->coccus_flag = 1;
   atom->sphere_flag = 1;
   atom->radius_flag = atom->rmass_flag = atom->omega_flag =
-    atom->torque_flag = atom->biomass_flag = atom->outer_radius_flag =
-    atom->outer_mass_flag = 1;
+    atom->torque_flag =  atom->outer_radius_flag  = atom->outer_mass_flag =
+      atom->biomass_flag = 1;
+
+  // strings with peratom variables to include in each AtomVec method
+  // strings cannot contain fields in corresponding AtomVec default strings
+  // order of fields in a string does not matter
+  // except: fields_data_atom & fields_data_vel must match data file
+
+  fields_grow = (char *) "radius rmass omega torque outer_mass outer_radius biomass";
+  fields_copy = (char *) "radius rmass omega outer_mass outer_radius biomass";
+  fields_comm = (char *) "";
+  fields_comm_vel = (char *) "omega";
+  fields_reverse = (char *) "torque";
+  fields_border = (char *) "radius rmass outer_mass outer_radius biomass";
+  fields_border_vel = (char *) "radius rmass omega outer_mass outer_radius biomass";
+  fields_exchange = (char *) "radius rmass omega outer_mass outer_radius biomass";
+  fields_restart = (char *) "radius rmass omega outer_mass outer_radius biomass";
+  fields_create = (char *) "radius rmass omega outer_mass outer_radius biomass";
+  fields_data_atom = (char *) "id type radius rmass x outer_radius biomass";
+  fields_data_vel = (char *) "id v omega";
+}
+
+/* ----------------------------------------------------------------------
+   process sub-style args
+   optional arg = 0/1 for static/dynamic particle radii
+------------------------------------------------------------------------- */
+
+void AtomVecCoccus::process_args(int narg, char **arg)
+{
+  if (narg != 0 && narg != 1)
+    error->all(FLERR,"Illegal atom_style coccus command");
+
+  radvary = 1;
+  if (narg == 1) {
+    radvary = utils::numeric(FLERR,arg[0],true,lmp);
+    if (radvary < 0 || radvary > 1)
+      error->all(FLERR,"Illegal atom_style coccus command");
+  }
+
+  // dynamic particle properties must be communicated every step
+
+  if (radvary) {
+    fields_comm = (char *) "radius rmass outer_mass outer_radius";
+    fields_comm_vel = (char *) "radius rmass omega outer_mass outer_radius";
+  }
+
+  // delay setting up of fields until now
+
+  setup_fields();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -60,1107 +91,119 @@ AtomVecCoccus::AtomVecCoccus(LAMMPS *lmp) : AtomVec(lmp)
 void AtomVecCoccus::init()
 {
   AtomVec::init();
+
+  // check if optional radvary setting should have been set to 1
+
+  for (int i = 0; i < modify->nfix; i++)
+    if (strcmp(modify->fix[i]->style,"adapt") == 0) {
+      FixAdapt *fix = (FixAdapt *) modify->fix[i];
+      if (fix->diamflag && radvary == 0)
+        error->all(FLERR,"Fix adapt changes particle radii "
+                   "but atom_style coccus is not dynamic");
+    } else if (strcmp(modify->fix[i]->style,"nufeb/monod") == 0) {
+	if (radvary == 0)
+	  error->all(FLERR,"Fix nufeb/monod changes particle radii "
+		     "but atom_style coccus is not dynamic");
+    } else if (strcmp(modify->fix[i]->style,"nufeb/divide") == 0) {
+	if (radvary == 0)
+	  error->all(FLERR,"Fix nufeb/divide changes particle radii "
+		     "but atom_style coccus is not dynamic");
+    }
 }
 
 /* ----------------------------------------------------------------------
-   grow atom arrays
-   n = 0 grows arrays by a chunk
-   n > 0 allocates arrays to size n
+   set local copies of all grow ptrs used by this class, except defaults
+   needed in replicate when 2 atom classes exist and it calls pack_restart()
 ------------------------------------------------------------------------- */
 
-void AtomVecCoccus::grow(int n)
+void AtomVecCoccus::grow_pointers()
 {
-  if (n == 0) grow_nmax();
-  else nmax = n;
-  atom->nmax = nmax;
-  if (nmax < 0)
-    error->one(FLERR,"Per-processor system is too big");
-
-  tag = memory->grow(atom->tag,nmax,"atom:tag");
-  type = memory->grow(atom->type,nmax,"atom:type");
-  mask = memory->grow(atom->mask,nmax,"atom:mask");
-  image = memory->grow(atom->image,nmax,"atom:image");
-  x = memory->grow(atom->x,nmax,3,"atom:x");
-  v = memory->grow(atom->v,nmax,3,"atom:v");
-  f = memory->grow(atom->f,nmax*comm->nthreads,3,"atom:f");
-
-  radius = memory->grow(atom->radius,nmax,"atom:radius");
-  rmass = memory->grow(atom->rmass,nmax,"atom:rmass");
-  biomass = memory->grow(atom->biomass,nmax,"atom:biomass");
-  outer_radius = memory->grow(atom->outer_radius,nmax,"atom:outer_radius");
-  outer_mass = memory->grow(atom->outer_mass,nmax,"atom:outer_mass");
-  omega = memory->grow(atom->omega,nmax,3,"atom:omega");
-  torque = memory->grow(atom->torque,nmax*comm->nthreads,3,"atom:torque");
-
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      modify->fix[atom->extra_grow[iextra]]->grow_arrays(nmax);
-}
-
-/* ----------------------------------------------------------------------
-   reset local array ptrs
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::grow_reset()
-{
-  tag = atom->tag; type = atom->type;
-  mask = atom->mask; image = atom->image;
-  x = atom->x; v = atom->v; f = atom->f;
-  radius = atom->radius; rmass = atom->rmass;
+  radius = atom->radius;
+  rmass = atom->rmass;
+  omega = atom->omega;
   biomass = atom->biomass;
-  outer_radius = atom->outer_radius; outer_mass = atom->outer_mass;
-  omega = atom->omega; torque = atom->torque;
+  outer_radius = atom->outer_radius;
+  outer_mass = atom->outer_mass;
 }
 
 /* ----------------------------------------------------------------------
-   copy atom I info to atom J
+   initialize non-zero atom quantities
 ------------------------------------------------------------------------- */
 
-void AtomVecCoccus::copy(int i, int j, int delflag)
+void AtomVecCoccus::create_atom_post(int ilocal)
 {
-  tag[j] = tag[i];
-  type[j] = type[i];
-  mask[j] = mask[i];
-  image[j] = image[i];
-  x[j][0] = x[i][0];
-  x[j][1] = x[i][1];
-  x[j][2] = x[i][2];
-  v[j][0] = v[i][0];
-  v[j][1] = v[i][1];
-  v[j][2] = v[i][2];
-
-  radius[j] = radius[i];
-  rmass[j] = rmass[i];
-  biomass[j] = biomass[i];
-  outer_radius[j] = outer_radius[i];
-  outer_mass[j] = outer_mass[i];
-  omega[j][0] = omega[i][0];
-  omega[j][1] = omega[i][1];
-  omega[j][2] = omega[i][2];
-
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      modify->fix[atom->extra_grow[iextra]]->copy_arrays(i,j,delflag);
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_comm(int n, int *list, double *buf,
-			  int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      buf[m++] = outer_radius[j];
-      buf[m++] = outer_mass[j];
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0]*domain->xprd + pbc[5]*domain->xy + pbc[4]*domain->xz;
-      dy = pbc[1]*domain->yprd + pbc[3]*domain->yz;
-      dz = pbc[2]*domain->zprd;
-    }
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0] + dx;
-      buf[m++] = x[j][1] + dy;
-      buf[m++] = x[j][2] + dz;
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      buf[m++] = outer_radius[j];
-      buf[m++] = outer_mass[j];
-    }
-  }
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_comm_vel(int n, int *list, double *buf,
-			      int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz,dvx,dvy,dvz;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      buf[m++] = outer_radius[j];
-      buf[m++] = outer_mass[j];
-      buf[m++] = v[j][0];
-      buf[m++] = v[j][1];
-      buf[m++] = v[j][2];
-      buf[m++] = omega[j][0];
-      buf[m++] = omega[j][1];
-      buf[m++] = omega[j][2];
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0]*domain->xprd + pbc[5]*domain->xy + pbc[4]*domain->xz;
-      dy = pbc[1]*domain->yprd + pbc[3]*domain->yz;
-      dz = pbc[2]*domain->zprd;
-    }
-    if (!deform_vremap) {
-      for (i = 0; i < n; i++) {
-	j = list[i];
-	buf[m++] = x[j][0] + dx;
-	buf[m++] = x[j][1] + dy;
-	buf[m++] = x[j][2] + dz;
-	buf[m++] = radius[j];
-	buf[m++] = rmass[j];
-	buf[m++] = biomass[j];
-	buf[m++] = outer_radius[j];
-	buf[m++] = outer_mass[j];
-	buf[m++] = v[j][0];
-	buf[m++] = v[j][1];
-	buf[m++] = v[j][2];
-	buf[m++] = omega[j][0];
-	buf[m++] = omega[j][1];
-	buf[m++] = omega[j][2];
-      }
-    } else {
-      dvx = pbc[0]*h_rate[0] + pbc[5]*h_rate[5] + pbc[4]*h_rate[4];
-      dvy = pbc[1]*h_rate[1] + pbc[3]*h_rate[3];
-      dvz = pbc[2]*h_rate[2];
-      for (i = 0; i < n; i++) {
-	j = list[i];
-	buf[m++] = x[j][0] + dx;
-	buf[m++] = x[j][1] + dy;
-	buf[m++] = x[j][2] + dz;
-	buf[m++] = radius[j];
-	buf[m++] = rmass[j];
-	buf[m++] = biomass[j];
-	buf[m++] = outer_radius[j];
-	buf[m++] = outer_mass[j];
-	if (mask[i] & deform_groupbit) {
-	  buf[m++] = v[j][0] + dvx;
-	  buf[m++] = v[j][1] + dvy;
-	  buf[m++] = v[j][2] + dvz;
-	} else {
-	  buf[m++] = v[j][0];
-	  buf[m++] = v[j][1];
-	  buf[m++] = v[j][2];
-	}
-	buf[m++] = omega[j][0];
-	buf[m++] = omega[j][1];
-	buf[m++] = omega[j][2];
-      }
-    }
-  }
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_comm_hybrid(int n, int *list, double *buf)
-{
-  int i,j,m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    buf[m++] = radius[j];
-    buf[m++] = rmass[j];
-    buf[m++] = biomass[j];
-    buf[m++] = outer_radius[j];
-    buf[m++] = outer_mass[j];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-void AtomVecCoccus::unpack_comm(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    outer_radius[i] = buf[m++];
-    outer_mass[i] = buf[m++];
-  }
-}
-
-/* ---------------------------------------------------------------------- */
-
-void AtomVecCoccus::unpack_comm_vel(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    outer_radius[i] = buf[m++];
-    outer_mass[i] = buf[m++];
-    v[i][0] = buf[m++];
-    v[i][1] = buf[m++];
-    v[i][2] = buf[m++];
-    omega[i][0] = buf[m++];
-    omega[i][1] = buf[m++];
-    omega[i][2] = buf[m++];
-  }
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::unpack_comm_hybrid(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    outer_radius[i] = buf[m++];
-    outer_mass[i] = buf[m++];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_reverse(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    buf[m++] = f[i][0];
-    buf[m++] = f[i][1];
-    buf[m++] = f[i][2];
-    buf[m++] = torque[i][0];
-    buf[m++] = torque[i][1];
-    buf[m++] = torque[i][2];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_reverse_hybrid(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    buf[m++] = torque[i][0];
-    buf[m++] = torque[i][1];
-    buf[m++] = torque[i][2];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-void AtomVecCoccus::unpack_reverse(int n, int *list, double *buf)
-{
-  int i,j,m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    f[j][0] += buf[m++];
-    f[j][1] += buf[m++];
-    f[j][2] += buf[m++];
-    torque[j][0] += buf[m++];
-    torque[j][1] += buf[m++];
-    torque[j][2] += buf[m++];
-  }
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::unpack_reverse_hybrid(int n, int *list, double *buf)
-{
-  int i,j,m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    torque[j][0] += buf[m++];
-    torque[j][1] += buf[m++];
-    torque[j][2] += buf[m++];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_border(int n, int *list, double *buf,
-			    int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      buf[m++] = ubuf(tag[j]).d;
-      buf[m++] = ubuf(type[j]).d;
-      buf[m++] = ubuf(mask[j]).d;
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      buf[m++] = outer_radius[j];
-      buf[m++] = outer_mass[j];
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0];
-      dy = pbc[1];
-      dz = pbc[2];
-    }
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0] + dx;
-      buf[m++] = x[j][1] + dy;
-      buf[m++] = x[j][2] + dz;
-      buf[m++] = ubuf(tag[j]).d;
-      buf[m++] = ubuf(type[j]).d;
-      buf[m++] = ubuf(mask[j]).d;
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      buf[m++] = outer_radius[j];
-      buf[m++] = outer_mass[j];
-    }
-  }
-
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->pack_border(n,list,&buf[m]);
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_border_vel(int n, int *list, double *buf,
-				int pbc_flag, int *pbc)
-{
-  int i,j,m;
-  double dx,dy,dz,dvx,dvy,dvz;
-
-  m = 0;
-  if (pbc_flag == 0) {
-    for (i = 0; i < n; i++) {
-      j = list[i];
-      buf[m++] = x[j][0];
-      buf[m++] = x[j][1];
-      buf[m++] = x[j][2];
-      buf[m++] = ubuf(tag[j]).d;
-      buf[m++] = ubuf(type[j]).d;
-      buf[m++] = ubuf(mask[j]).d;
-      buf[m++] = radius[j];
-      buf[m++] = rmass[j];
-      buf[m++] = biomass[j];
-      buf[m++] = outer_radius[j];
-      buf[m++] = outer_mass[j];
-      buf[m++] = v[j][0];
-      buf[m++] = v[j][1];
-      buf[m++] = v[j][2];
-      buf[m++] = omega[j][0];
-      buf[m++] = omega[j][1];
-      buf[m++] = omega[j][2];
-    }
-  } else {
-    if (domain->triclinic == 0) {
-      dx = pbc[0]*domain->xprd;
-      dy = pbc[1]*domain->yprd;
-      dz = pbc[2]*domain->zprd;
-    } else {
-      dx = pbc[0];
-      dy = pbc[1];
-      dz = pbc[2];
-    }
-    if (!deform_vremap) {
-      for (i = 0; i < n; i++) {
-        j = list[i];
-        buf[m++] = x[j][0] + dx;
-        buf[m++] = x[j][1] + dy;
-        buf[m++] = x[j][2] + dz;
-        buf[m++] = ubuf(tag[j]).d;
-        buf[m++] = ubuf(type[j]).d;
-        buf[m++] = ubuf(mask[j]).d;
-        buf[m++] = radius[j];
-        buf[m++] = rmass[j];
-        buf[m++] = biomass[j];
-	buf[m++] = outer_radius[j];
-	buf[m++] = outer_mass[j];
-        buf[m++] = v[j][0];
-        buf[m++] = v[j][1];
-        buf[m++] = v[j][2];
-        buf[m++] = omega[j][0];
-        buf[m++] = omega[j][1];
-        buf[m++] = omega[j][2];
-      }
-    } else {
-      dvx = pbc[0]*h_rate[0] + pbc[5]*h_rate[5] + pbc[4]*h_rate[4];
-      dvy = pbc[1]*h_rate[1] + pbc[3]*h_rate[3];
-      dvz = pbc[2]*h_rate[2];
-      for (i = 0; i < n; i++) {
-        j = list[i];
-        buf[m++] = x[j][0] + dx;
-        buf[m++] = x[j][1] + dy;
-        buf[m++] = x[j][2] + dz;
-        buf[m++] = ubuf(tag[j]).d;
-        buf[m++] = ubuf(type[j]).d;
-        buf[m++] = ubuf(mask[j]).d;
-        buf[m++] = radius[j];
-        buf[m++] = rmass[j];
-        buf[m++] = biomass[j];
-	buf[m++] = outer_radius[j];
-	buf[m++] = outer_mass[j];
-        if (mask[i] & deform_groupbit) {
-          buf[m++] = v[j][0] + dvx;
-          buf[m++] = v[j][1] + dvy;
-          buf[m++] = v[j][2] + dvz;
-        } else {
-          buf[m++] = v[j][0];
-          buf[m++] = v[j][1];
-          buf[m++] = v[j][2];
-        }
-        buf[m++] = omega[j][0];
-        buf[m++] = omega[j][1];
-        buf[m++] = omega[j][2];
-      }
-    }
-  }
-
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->pack_border(n,list,&buf[m]);
-
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_border_hybrid(int n, int *list, double *buf)
-{
-  int i,j,m;
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    j = list[i];
-    buf[m++] = radius[j];
-    buf[m++] = rmass[j];
-    buf[m++] = biomass[j];
-    buf[m++] = outer_radius[j];
-    buf[m++] = outer_mass[j];
-  }
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-void AtomVecCoccus::unpack_border(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    if (i == nmax) grow(0);
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
-    tag[i] = (tagint) ubuf(buf[m++]).i;
-    type[i] = (int) ubuf(buf[m++]).i;
-    mask[i] = (int) ubuf(buf[m++]).i;
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    outer_radius[i] = buf[m++];
-    outer_mass[i] = buf[m++];
-  }
-
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->
-        unpack_border(n,first,&buf[m]);
-}
-
-
-/* ---------------------------------------------------------------------- */
-
-void AtomVecCoccus::unpack_border_vel(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    if (i == nmax) grow(0);
-    x[i][0] = buf[m++];
-    x[i][1] = buf[m++];
-    x[i][2] = buf[m++];
-    tag[i] = (tagint) ubuf(buf[m++]).i;
-    type[i] = (int) ubuf(buf[m++]).i;
-    mask[i] = (int) ubuf(buf[m++]).i;
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    outer_radius[i] = buf[m++];
-    outer_mass[i] = buf[m++];
-    v[i][0] = buf[m++];
-    v[i][1] = buf[m++];
-    v[i][2] = buf[m++];
-    omega[i][0] = buf[m++];
-    omega[i][1] = buf[m++];
-    omega[i][2] = buf[m++];
-  }
-
-  if (atom->nextra_border)
-    for (int iextra = 0; iextra < atom->nextra_border; iextra++)
-      m += modify->fix[atom->extra_border[iextra]]->
-        unpack_border(n,first,&buf[m]);
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::unpack_border_hybrid(int n, int first, double *buf)
-{
-  int i,m,last;
-
-  m = 0;
-  last = first + n;
-  for (i = first; i < last; i++) {
-    radius[i] = buf[m++];
-    rmass[i] = buf[m++];
-    biomass[i] = buf[m++];
-    outer_radius[i] = buf[m++];
-    outer_mass[i] = buf[m++];
-  }
-  return m;
+  radius[ilocal] = 0.5e-6;
+  rmass[ilocal] = 4.0*MY_PI/3.0 * 0.5e-6*0.5e-6*0.5e-6;
+  biomass[ilocal] = rmass[ilocal];
+  outer_radius[ilocal] = radius[ilocal];
+  outer_mass[ilocal] = 0;
 }
 
 /* ----------------------------------------------------------------------
-   pack data for atom I for sending to another proc
-   xyz must be 1st 3 values, so comm::exchange() can test on them
+   modify what AtomVec::data_atom() just unpacked
+   or initialize other atom quantities
 ------------------------------------------------------------------------- */
 
-int AtomVecCoccus::pack_exchange(int i, double *buf)
+void AtomVecCoccus::data_atom_post(int ilocal)
 {
-  int m = 1;
-  buf[m++] = x[i][0];
-  buf[m++] = x[i][1];
-  buf[m++] = x[i][2];
-  buf[m++] = v[i][0];
-  buf[m++] = v[i][1];
-  buf[m++] = v[i][2];
-  buf[m++] = ubuf(tag[i]).d;
-  buf[m++] = ubuf(type[i]).d;
-  buf[m++] = ubuf(mask[i]).d;
-  buf[m++] = ubuf(image[i]).d;
+  radius_one = 0.5 * atom->radius[ilocal];
+  radius[ilocal] = radius_one;
+  if (radius_one > 0.0)
+    rmass[ilocal] *= 4.0*MY_PI/3.0 * radius_one*radius_one*radius_one;
 
-  buf[m++] = radius[i];
-  buf[m++] = rmass[i];
-  buf[m++] = biomass[i];
-  buf[m++] = outer_radius[i];
-  buf[m++] = outer_mass[i];
-  buf[m++] = omega[i][0];
-  buf[m++] = omega[i][1];
-  buf[m++] = omega[i][2];
-
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      m += modify->fix[atom->extra_grow[iextra]]->pack_exchange(i,&buf[m]);
-
-  buf[0] = m;
-  return m;
-}
-
-/* ---------------------------------------------------------------------- */
-
-int AtomVecCoccus::unpack_exchange(double *buf)
-{
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) grow(0);
-
-  int m = 1;
-  x[nlocal][0] = buf[m++];
-  x[nlocal][1] = buf[m++];
-  x[nlocal][2] = buf[m++];
-  v[nlocal][0] = buf[m++];
-  v[nlocal][1] = buf[m++];
-  v[nlocal][2] = buf[m++];
-  tag[nlocal] = (tagint) ubuf(buf[m++]).i;
-  type[nlocal] = (int) ubuf(buf[m++]).i;
-  mask[nlocal] = (int) ubuf(buf[m++]).i;
-  image[nlocal] = (imageint) ubuf(buf[m++]).i;
-
-  radius[nlocal] = buf[m++];
-  rmass[nlocal] = buf[m++];
-  biomass[nlocal] = buf[m++];
-  outer_radius[nlocal] = buf[m++];
-  outer_mass[nlocal] = buf[m++];
-  omega[nlocal][0] = buf[m++];
-  omega[nlocal][1] = buf[m++];
-  omega[nlocal][2] = buf[m++];
-
-  if (atom->nextra_grow)
-    for (int iextra = 0; iextra < atom->nextra_grow; iextra++)
-      m += modify->fix[atom->extra_grow[iextra]]->
-        unpack_exchange(nlocal,&buf[m]);
-
-  atom->nlocal++;
-  return m;
-}
-
-/* ----------------------------------------------------------------------
-   size of restart data for all atoms owned by this proc
-   include extra data stored by fixes
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::size_restart()
-{
-  int i;
-
-  int nlocal = atom->nlocal;
-  int n = 19 * nlocal;
-
-  if (atom->nextra_restart)
-    for (int iextra = 0; iextra < atom->nextra_restart; iextra++)
-      for (i = 0; i < nlocal; i++)
-        n += modify->fix[atom->extra_restart[iextra]]->size_restart(i);
-
-  return n;
-}
-
-/* ----------------------------------------------------------------------
-   pack atom I's data for restart file including extra quantities
-   xyz must be 1st 3 values, so that read_restart can test on them
-   molecular types may be negative, but write as positive
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_restart(int i, double *buf)
-{
-  int m = 1;
-  buf[m++] = x[i][0];
-  buf[m++] = x[i][1];
-  buf[m++] = x[i][2];
-  buf[m++] = ubuf(tag[i]).d;
-  buf[m++] = ubuf(type[i]).d;
-  buf[m++] = ubuf(mask[i]).d;
-  buf[m++] = ubuf(image[i]).d;
-  buf[m++] = v[i][0];
-  buf[m++] = v[i][1];
-  buf[m++] = v[i][2];
-
-  buf[m++] = radius[i];
-  buf[m++] = rmass[i];
-  buf[m++] = biomass[i];
-  buf[m++] = outer_radius[i];
-  buf[m++] = outer_mass[i];
-  buf[m++] = omega[i][0];
-  buf[m++] = omega[i][1];
-  buf[m++] = omega[i][2];
-
-  if (atom->nextra_restart)
-    for (int iextra = 0; iextra < atom->nextra_restart; iextra++)
-      m += modify->fix[atom->extra_restart[iextra]]->pack_restart(i,&buf[m]);
-
-  buf[0] = m;
-  return m;
-}
-
-/* ----------------------------------------------------------------------
-   unpack data for one atom from restart file including extra quantities
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::unpack_restart(double *buf)
-{
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) {
-    grow(0);
-    if (atom->nextra_store)
-      memory->grow(atom->extra,nmax,atom->nextra_store,"atom:extra");
-  }
-
-  int m = 1;
-  x[nlocal][0] = buf[m++];
-  x[nlocal][1] = buf[m++];
-  x[nlocal][2] = buf[m++];
-  tag[nlocal] = (tagint) ubuf(buf[m++]).i;
-  type[nlocal] = (int) ubuf(buf[m++]).i;
-  mask[nlocal] = (int) ubuf(buf[m++]).i;
-  image[nlocal] = (imageint) ubuf(buf[m++]).i;
-  v[nlocal][0] = buf[m++];
-  v[nlocal][1] = buf[m++];
-  v[nlocal][2] = buf[m++];
-
-  radius[nlocal] = buf[m++];
-  rmass[nlocal] = buf[m++];
-  biomass[nlocal] = buf[m++];
-  outer_radius[nlocal] = buf[m++];
-  outer_mass[nlocal] = buf[m++];
-  omega[nlocal][0] = buf[m++];
-  omega[nlocal][1] = buf[m++];
-  omega[nlocal][2] = buf[m++];
-
-  double **extra = atom->extra;
-  if (atom->nextra_store) {
-    int size = static_cast<int> (buf[0]) - m;
-    for (int i = 0; i < size; i++) extra[nlocal][i] = buf[m++];
-  }
-
-  atom->nlocal++;
-  return m;
-}
-
-/* ----------------------------------------------------------------------
-   create one atom of itype at coord
-   set other values to defaults
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::create_atom(int itype, double *coord)
-{
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) grow(0);
-
-  tag[nlocal] = 0;
-  type[nlocal] = itype;
-  x[nlocal][0] = coord[0];
-  x[nlocal][1] = coord[1];
-  x[nlocal][2] = coord[2];
-  mask[nlocal] = 1;
-  image[nlocal] = ((imageint) IMGMAX << IMG2BITS) |
-    ((imageint) IMGMAX << IMGBITS) | IMGMAX;
-  v[nlocal][0] = 0.0;
-  v[nlocal][1] = 0.0;
-  v[nlocal][2] = 0.0;
-
-  radius[nlocal] = 0.5;
-  rmass[nlocal] = 4.0*MY_PI/3.0 * radius[nlocal]*radius[nlocal]*radius[nlocal];
-  biomass[nlocal] = rmass[nlocal];
-  omega[nlocal][0] = 0.0;
-  omega[nlocal][1] = 0.0;
-  omega[nlocal][2] = 0.0;
-
-  outer_radius[nlocal] = radius[nlocal];
-  outer_mass[nlocal] = 0;
-
-  atom->nlocal++;
-}
-
-/* ----------------------------------------------------------------------
-   unpack one line from Atoms section of data file
-   initialize other atom quantities
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::data_atom(double *coord, imageint imagetmp, char **values)
-{
-  int nlocal = atom->nlocal;
-  if (nlocal == nmax) grow(0);
-
-  tag[nlocal] = ATOTAGINT(values[0]);
-  type[nlocal] = atoi(values[1]);
-  if (type[nlocal] <= 0 || type[nlocal] > atom->ntypes)
-    error->one(FLERR,"Invalid atom type in Atoms section of data file");
-
-  radius[nlocal] = 0.5 * atof(values[2]);
-  if (radius[nlocal] < 0.0)
-    error->one(FLERR,"Invalid diameter in Atoms section of data file");
-
-  double density = atof(values[3]);
-  if (density <= 0.0)
+  if (rmass[ilocal] <= 0.0)
     error->one(FLERR,"Invalid density in Atoms section of data file");
 
-  if (radius[nlocal] == 0.0) rmass[nlocal] = density;
-  else
-    rmass[nlocal] = 4.0*MY_PI/3.0 *
-      radius[nlocal]*radius[nlocal]*radius[nlocal] * density;
+  omega[ilocal][0] = 0.0;
+  omega[ilocal][1] = 0.0;
+  omega[ilocal][2] = 0.0;
 
-  x[nlocal][0] = coord[0];
-  x[nlocal][1] = coord[1];
-  x[nlocal][2] = coord[2];
-
-  image[nlocal] = imagetmp;
-
-  mask[nlocal] = 1;
-  v[nlocal][0] = 0.0;
-  v[nlocal][1] = 0.0;
-  v[nlocal][2] = 0.0;
-  omega[nlocal][0] = 0.0;
-  omega[nlocal][1] = 0.0;
-  omega[nlocal][2] = 0.0;
-
-  outer_radius[nlocal] = 0.5 * atof(values[7]);
-  if (outer_radius[nlocal] < radius[nlocal]) {
+  outer_radius_one = 0.5 * atom->outer_radius[ilocal];
+  outer_radius[ilocal] = outer_radius_one;
+  if (outer_radius[ilocal] < radius[ilocal]) {
     error->one(FLERR,"Outer radius must be greater than or equal to radius");
   }
-  outer_mass[nlocal] = (4.0*MY_PI/3.0)*
-    ((outer_radius[nlocal]*outer_radius[nlocal]*outer_radius[nlocal])
-     -(radius[nlocal]*radius[nlocal]*radius[nlocal])) * 30;
 
-  double ratio = atof(values[8]);
-  if (ratio < 0 || ratio > 1)
+  outer_mass[ilocal] = (4.0*MY_PI/3.0)*
+    ((outer_radius[ilocal]*outer_radius[ilocal]*outer_radius[ilocal])
+     -(radius[ilocal]*radius[ilocal]*radius[ilocal])) * 30;
+
+  biomass_one = atom->biomass[ilocal];
+  if (biomass_one < 0 || biomass_one > 1)
     error->one(FLERR,"Biomass/Mass (dry/wet weight) ratio must be between 0-1");
-  biomass[nlocal] = rmass[nlocal] * ratio;
+  biomass[ilocal] = biomass_one*rmass[ilocal];
+}
 
-  atom->nlocal++;
+
+/* ----------------------------------------------------------------------
+   modify values for AtomVec::pack_data() to pack
+------------------------------------------------------------------------- */
+
+void AtomVecCoccus::pack_data_pre(int ilocal)
+{
+  radius_one = radius[ilocal];
+  rmass_one = rmass[ilocal];
+
+  radius[ilocal] *= 2.0;
+  if (radius_one != 0.0)
+    rmass[ilocal] =
+      rmass_one / (4.0*MY_PI/3.0 * radius_one*radius_one*radius_one);
+
+  outer_radius_one = outer_radius[ilocal];
+  outer_radius[ilocal] *= 2.0;
+
+  biomass_one = biomass[ilocal];
+  biomass[ilocal] = biomass_one/rmass_one;
 }
 
 /* ----------------------------------------------------------------------
-   unpack hybrid quantities from one line in Atoms section of data file
-   initialize other atom quantities for this sub-style
+   unmodify values packed by AtomVec::pack_data()
 ------------------------------------------------------------------------- */
 
-int AtomVecCoccus::data_atom_hybrid(int nlocal, char **values)
+void AtomVecCoccus::pack_data_post(int ilocal)
 {
-  radius[nlocal] = 0.5 * atof(values[0]);
-  if (radius[nlocal] < 0.0)
-    error->one(FLERR,"Invalid radius in Atoms section of data file: radius < 0");
-
-  double density = atof(values[1]);
-  if (density <= 0.0)
-    error->one(FLERR,"Invalid density in Atoms section of data file: density <= 0");
-
-  if (radius[nlocal] == 0.0) rmass[nlocal] = density;
-  else
-    rmass[nlocal] = 4.0*MY_PI/3.0 *
-      radius[nlocal]*radius[nlocal]*radius[nlocal] * density;
-
-  outer_radius[nlocal] = 0.5 * atof(values[2]);
-  if (outer_radius[nlocal] < radius[nlocal]) {
-    error->one(FLERR,"Invalid outer radius in Atoms section of data file:"
-	"outer_radius < radius");
-  }
-  outer_mass[nlocal] = (4.0*MY_PI/3.0)*
-    ((outer_radius[nlocal]*outer_radius[nlocal]*outer_radius[nlocal])
-     -(radius[nlocal]*radius[nlocal]*radius[nlocal])) * 30;
-
-  double ratio = atof(values[3]);
-  if (ratio < 0 || ratio > 1)
-    error->one(FLERR,"Invalid biomass/Mass ratio in Atoms section of data file:"
-	"ratio < 0 or ratio > 1");
-  biomass[nlocal] = rmass[nlocal] * ratio;
-
-  return 4;
-}
-
-/* ----------------------------------------------------------------------
-   unpack one line from Velocities section of data file
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::data_vel(int m, char **values)
-{
-  v[m][0] = atof(values[0]);
-  v[m][1] = atof(values[1]);
-  v[m][2] = atof(values[2]);
-  omega[m][0] = atof(values[3]);
-  omega[m][1] = atof(values[4]);
-  omega[m][2] = atof(values[5]);
-}
-
-/* ----------------------------------------------------------------------
-   unpack hybrid quantities from one line in Velocities section of data file
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::data_vel_hybrid(int m, char **values)
-{
-  omega[m][0] = atof(values[0]);
-  omega[m][1] = atof(values[1]);
-  omega[m][2] = atof(values[2]);
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   pack atom info for data file including 3 image flags
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::pack_data(double **buf)
-{
-  int nlocal = atom->nlocal;
-  for (int i = 0; i < nlocal; i++) {
-    buf[i][0] = ubuf(tag[i]).d;
-    buf[i][1] = ubuf(type[i]).d;
-    buf[i][2] = 2.0*radius[i];
-    if (radius[i] == 0.0) buf[i][3] = rmass[i];
-    else
-      buf[i][3] = rmass[i] / (4.0*MY_PI/3.0 * radius[i]*radius[i]*radius[i]);
-    buf[i][4] = x[i][0];
-    buf[i][5] = x[i][1];
-    buf[i][6] = x[i][2];
-    buf[i][7] = outer_radius[i];
-    buf[i][8] = biomass[i];
-    buf[i][9] = ubuf((image[i] & IMGMASK) - IMGMAX).d;
-    buf[i][10] = ubuf((image[i] >> IMGBITS & IMGMASK) - IMGMAX).d;
-    buf[i][11] = ubuf((image[i] >> IMG2BITS) - IMGMAX).d;
-  }
-}
-
-/* ----------------------------------------------------------------------
-   pack hybrid atom info for data file
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_data_hybrid(int i, double *buf)
-{
-  buf[0] = 2.0*radius[i];
-  if (radius[i] == 0.0) buf[1] = rmass[i];
-  else buf[1] = rmass[i] / (4.0*MY_PI/3.0 * radius[i]*radius[i]*radius[i]);
-  buf[2] = outer_radius[i];
-  buf[3] = biomass[i] / rmass[i];
-  return 4;
-}
-
-/* ----------------------------------------------------------------------
-   write atom info to data file including 3 image flags
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::write_data(FILE *fp, int n, double **buf)
-{
-  for (int i = 0; i < n; i++)
-    fprintf(fp,TAGINT_FORMAT
-            " %d %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e %d %d %d\n",
-            (tagint) ubuf(buf[i][0]).i,(int) ubuf(buf[i][1]).i,
-            buf[i][2],buf[i][3],
-            buf[i][4],buf[i][5],buf[i][6],buf[i][7],buf[i][8],
-            (int) ubuf(buf[i][9]).i,(int) ubuf(buf[i][10]).i,
-            (int) ubuf(buf[i][11]).i);
-}
-
-/* ----------------------------------------------------------------------
-   write hybrid atom info to data file
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::write_data_hybrid(FILE *fp, double *buf)
-{
-  fprintf(fp," %-1.16e %-1.16e %-1.16e %-1.16e",buf[0],buf[1],buf[2],buf[3]);
-  return 4;
-}
-
-/* ----------------------------------------------------------------------
-   pack velocity info for data file
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::pack_vel(double **buf)
-{
-  int nlocal = atom->nlocal;
-  for (int i = 0; i < nlocal; i++) {
-    buf[i][0] = ubuf(tag[i]).d;
-    buf[i][1] = v[i][0];
-    buf[i][2] = v[i][1];
-    buf[i][3] = v[i][2];
-    buf[i][4] = omega[i][0];
-    buf[i][5] = omega[i][1];
-    buf[i][6] = omega[i][2];
-  }
-}
-
-/* ----------------------------------------------------------------------
-   pack hybrid velocity info for data file
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::pack_vel_hybrid(int i, double *buf)
-{
-  buf[0] = omega[i][0];
-  buf[1] = omega[i][1];
-  buf[2] = omega[i][2];
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   write velocity info to data file
-------------------------------------------------------------------------- */
-
-void AtomVecCoccus::write_vel(FILE *fp, int n, double **buf)
-{
-  for (int i = 0; i < n; i++)
-    fprintf(fp,TAGINT_FORMAT
-            " %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e %-1.16e\n",
-            (tagint) ubuf(buf[i][0]).i,buf[i][1],buf[i][2],buf[i][3],
-            buf[i][4],buf[i][5],buf[i][6]);
-}
-
-/* ----------------------------------------------------------------------
-   write hybrid velocity info to data file
-------------------------------------------------------------------------- */
-
-int AtomVecCoccus::write_vel_hybrid(FILE *fp, double *buf)
-{
-  fprintf(fp," %-1.16e %-1.16e %-1.16e",buf[0],buf[1],buf[2]);
-  return 3;
-}
-
-/* ----------------------------------------------------------------------
-   return # of bytes of allocated memory
-------------------------------------------------------------------------- */
-
-bigint AtomVecCoccus::memory_usage()
-{
-  bigint bytes = 0;
-
-  if (atom->memcheck("tag")) bytes += memory->usage(tag,nmax);
-  if (atom->memcheck("type")) bytes += memory->usage(type,nmax);
-  if (atom->memcheck("mask")) bytes += memory->usage(mask,nmax);
-  if (atom->memcheck("image")) bytes += memory->usage(image,nmax);
-  if (atom->memcheck("x")) bytes += memory->usage(x,nmax,3);
-  if (atom->memcheck("v")) bytes += memory->usage(v,nmax,3);
-  if (atom->memcheck("f")) bytes += memory->usage(f,nmax*comm->nthreads,3);
-
-  if (atom->memcheck("radius")) bytes += memory->usage(radius,nmax);
-  if (atom->memcheck("rmass")) bytes += memory->usage(rmass,nmax);
-  if (atom->memcheck("biomass")) bytes += memory->usage(biomass,nmax);
-  if (atom->memcheck("outer_mass")) bytes += memory->usage(outer_mass,nmax);
-  if (atom->memcheck("outer_radius")) bytes += memory->usage(outer_radius,nmax);
-  if (atom->memcheck("omega")) bytes += memory->usage(omega,nmax,3);
-  if (atom->memcheck("torque"))
-    bytes += memory->usage(torque,nmax*comm->nthreads,3);
-
-  return bytes;
+  radius[ilocal] = radius_one;
+  rmass[ilocal] = rmass_one;
+  outer_radius[ilocal] = outer_radius_one;
+  biomass[ilocal] = biomass_one;
 }

@@ -27,11 +27,11 @@ using namespace LAMMPS_NS;
 
 GridVecMonod::GridVecMonod(LAMMPS *lmp) : GridVec(lmp)
 {
-  mask = NULL;
-  conc = NULL;
-  reac = NULL;
-  dens = NULL;
-  growth = NULL;
+  mask = nullptr;
+  conc = nullptr;
+  reac = nullptr;
+  dens = nullptr;
+  growth = nullptr;
   grid->monod_flag = 1;
 }
 
@@ -126,11 +126,11 @@ void GridVecMonod::set(int narg, char **arg)
   if (narg != 3 && narg != 9) error->all(FLERR, "Invalid grid_modify set command");
   int isub = grid->find(arg[1]);
   if (isub < 0) error->all(FLERR,"Cannot find substrate name");
-  if (narg == 3) set_monod(isub, force->numeric(FLERR, arg[2]));
-  else set_monod(isub, force->numeric(FLERR, arg[2]),
-		force->numeric(FLERR, arg[3]), force->numeric(FLERR, arg[4]),
-		force->numeric(FLERR, arg[5]), force->numeric(FLERR, arg[6]),
-		force->numeric(FLERR, arg[7]), force->numeric(FLERR, arg[8]));
+  if (narg == 3) set_monod(isub, utils::numeric(FLERR,arg[2],true,lmp));
+  else set_monod(isub, utils::numeric(FLERR,arg[2],true,lmp),
+		utils::numeric(FLERR,arg[3],true,lmp), utils::numeric(FLERR,arg[4],true,lmp),
+		utils::numeric(FLERR,arg[5],true,lmp), utils::numeric(FLERR,arg[6],true,lmp),
+		utils::numeric(FLERR,arg[6],true,lmp), utils::numeric(FLERR,arg[8],true,lmp));
 }
 
 

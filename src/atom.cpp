@@ -82,6 +82,7 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   nlocal = nghost = nmax = 0;
   ntypes = 0;
   nellipsoids = nlines = ntris = nbodies = 0;
+  nbacilli = 0;
   nbondtypes = nangletypes = ndihedraltypes = nimpropertypes = 0;
   nbonds = nangles = ndihedrals = nimpropers = 0;
 
@@ -121,14 +122,6 @@ Atom::Atom(LAMMPS *lmp) : Pointers(lmp)
   outer_radius = outer_mass = nullptr;
   biomass = nullptr;
   bacillus = nullptr;
-  nbacilli = 0;
- // nbacilli = 0;
-  //bacillus_flag = 0;
- // outer_radius_flag = outer_mass_flag = 0;
-//  outer_radius = NULL;
-//  outer_mass = NULL;
-//  biomass = NULL;
-//  bacillus = NULL;
 
   // molecular systems
   molecule = nullptr;
@@ -637,8 +630,9 @@ void Atom::set_atomflag_defaults()
   contact_radius_flag = smd_data_9_flag = smd_stress_flag = 0;
   eff_plastic_strain_flag = eff_plastic_strain_rate_flag = 0;
   // USER-NUFEB package
-  bacillus_flag = 0;
+  bacillus_flag = coccus_flag = 0;
   outer_radius_flag = outer_mass_flag = 0;
+  biomass_flag = 0;
 
   pdscale = 1.0;
 }

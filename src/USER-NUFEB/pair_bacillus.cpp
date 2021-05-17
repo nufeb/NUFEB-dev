@@ -49,10 +49,10 @@ PairBacillus::PairBacillus(LAMMPS *lmp) : Pair(lmp)
   mu = 0.0;
   cutoff = 0.0;
 
-  maxrad = NULL;
+  maxrad = nullptr;
 
-  k_n = NULL;
-  k_na = NULL;
+  k_n = nullptr;
+  k_na = nullptr;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -212,10 +212,10 @@ void PairBacillus::settings(int narg, char **arg)
 {
   if (narg < 4) error->all(FLERR,"Illegal pair_style bacillus command");
 
-  c_n = force->numeric(FLERR,arg[0]);
-  c_t = force->numeric(FLERR,arg[1]);
-  mu = force->numeric(FLERR,arg[2]);
-  cutoff = force->numeric(FLERR,arg[3]);
+  c_n = utils::numeric(FLERR,arg[0],true,lmp);
+  c_t = utils::numeric(FLERR,arg[1],true,lmp);
+  mu = utils::numeric(FLERR,arg[2],true,lmp);
+  cutoff = utils::numeric(FLERR,arg[3],true,lmp);
 }
 
 /* ----------------------------------------------------------------------
@@ -229,11 +229,11 @@ void PairBacillus::coeff(int narg, char **arg)
   if (!allocated) allocate();
 
   int ilo,ihi,jlo,jhi;
-  force->bounds(FLERR,arg[0],atom->ntypes,ilo,ihi);
-  force->bounds(FLERR,arg[1],atom->ntypes,jlo,jhi);
+  utils::bounds(FLERR,arg[0],1,atom->ntypes,ilo,ihi,error);
+  utils::bounds(FLERR,arg[1],1,atom->ntypes,jlo,jhi,error);
 
-  double k_n_one = force->numeric(FLERR,arg[2]);
-  double k_na_one = force->numeric(FLERR,arg[3]);
+  double k_n_one = utils::numeric(FLERR,arg[2],false,lmp);
+  double k_na_one = utils::numeric(FLERR,arg[2],false,lmp);
 
   int count = 0;
   for (int i = ilo; i <= ihi; i++) {

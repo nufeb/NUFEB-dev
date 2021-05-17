@@ -35,24 +35,24 @@ CommGrid::CommGrid(LAMMPS *lmp) : Pointers(lmp)
   nsend = 0;
   nrecvproc = 0;
   nsendproc = 0;
-  recvproc = NULL;
-  sendproc = NULL;
-  recv_begin = NULL;
-  recv_end = NULL;
-  send_begin = NULL;
-  send_end = NULL;
-  recv_cells = NULL;
-  send_cells = NULL;
-  buf_recv = NULL;
-  buf_send = NULL;
+  recvproc = nullptr;
+  sendproc = nullptr;
+  recv_begin = nullptr;
+  recv_end = nullptr;
+  send_begin = nullptr;
+  send_end = nullptr;
+  recv_cells = nullptr;
+  send_cells = nullptr;
+  buf_recv = nullptr;
+  buf_send = nullptr;
 
   nrecv_self = 0;
   nsend_self = 0;
-  recv_cells_self = NULL;
-  send_cells_self = NULL;
-  buf_self = NULL;
+  recv_cells_self = nullptr;
+  send_cells_self = nullptr;
+  buf_self = nullptr;
   
-  requests = NULL;
+  requests = nullptr;
 }
 
 /* ---------------------------------------------------------------------- */

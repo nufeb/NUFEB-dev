@@ -18,11 +18,11 @@
 #include "atom.h"
 #include "atom_vec.h"
 #include "error.h"
-#include "force.h"
 #include "neigh_list.h"
 #include "neighbor.h"
 #include "group.h"
 #include "pair.h"
+#include "force.h"
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -46,8 +46,8 @@ FixEPSAdhesion::FixEPSAdhesion(LAMMPS *lmp, int narg, char **arg) :
   ieps = group->find(arg[3]);
   if (ieps < 0)
     error->all(FLERR, "Can't find group in fix nufeb/adhesion/eps");
-  ke = force->numeric(FLERR, arg[4]);
-    
+  ke = utils::numeric(FLERR,arg[4],true,lmp);
+
   int iarg = 5;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "displace") == 0) {

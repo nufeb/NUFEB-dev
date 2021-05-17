@@ -16,7 +16,6 @@
 #include "fix_wall_adhesion.h"
 #include "atom.h"
 #include "error.h"
-#include "force.h"
 #include "group.h"
 
 using namespace LAMMPS_NS;
@@ -38,38 +37,38 @@ FixWallAdhesion::FixWallAdhesion(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR, "Can't find group name");
   eps_mask = group->bitmask[ieps];
   
-  kn = force->numeric(FLERR, arg[4]);
+  kn = utils::numeric(FLERR,arg[4],true,lmp);
 
   int iarg = 5;
   if (strcmp(arg[iarg],"xplane") == 0) {
     if (narg < iarg+3) error->all(FLERR,"Illegal fix walladh command");
     wallstyle = XPLANE;
     if (strcmp(arg[iarg+1],"NULL") == 0) lo = -BIG;
-    else lo = force->numeric(FLERR,arg[iarg+1]);
+    else lo = utils::numeric(FLERR,arg[iarg+1],true,lmp);
     if (strcmp(arg[iarg+2],"NULL") == 0) hi = BIG;
-    else hi = force->numeric(FLERR,arg[iarg+2]);
+    else hi = utils::numeric(FLERR,arg[iarg+2],true,lmp);
     iarg += 3;
   } else if (strcmp(arg[iarg],"yplane") == 0) {
     if (narg < iarg+3) error->all(FLERR,"Illegal fix walladh command");
     wallstyle = YPLANE;
     if (strcmp(arg[iarg+1],"NULL") == 0) lo = -BIG;
-    else lo = force->numeric(FLERR,arg[iarg+1]);
+    else lo = utils::numeric(FLERR,arg[iarg+1],true,lmp);
     if (strcmp(arg[iarg+2],"NULL") == 0) hi = BIG;
-    else hi = force->numeric(FLERR,arg[iarg+2]);
+    else hi = utils::numeric(FLERR,arg[iarg+2],true,lmp);
     iarg += 3;
   } else if (strcmp(arg[iarg],"zplane") == 0) {
     if (narg < iarg+3) error->all(FLERR,"Illegal fix walladh command");
     wallstyle = ZPLANE;
     if (strcmp(arg[iarg+1],"NULL") == 0) lo = -BIG;
-    else lo = force->numeric(FLERR,arg[iarg+1]);
+    else lo = utils::numeric(FLERR,arg[iarg+1],true,lmp);
     if (strcmp(arg[iarg+2],"NULL") == 0) hi = BIG;
-    else hi = force->numeric(FLERR,arg[iarg+2]);
+    else hi = utils::numeric(FLERR,arg[iarg+2],true,lmp);
     iarg += 3;
   } else if (strcmp(arg[iarg],"zcylinder") == 0) {
     if (narg < iarg+2) error->all(FLERR,"Illegal fix walladh command");
     wallstyle = ZCYLINDER;
     lo = hi = 0.0;
-    cylradius = force->numeric(FLERR,arg[iarg+1]);
+    cylradius = utils::numeric(FLERR,arg[iarg+1],true,lmp);
     iarg += 2;
   }
 }

@@ -29,7 +29,7 @@ using namespace FixConst;
 
 FixProperty::FixProperty(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg),
-  aprop(NULL), vprop(NULL)
+  aprop(nullptr), vprop(nullptr)
 {
   compute_flag = 0;
   restart_peratom = 1;

@@ -15,7 +15,6 @@
 #include "fix_death.h"
 #include "atom.h"
 #include "error.h"
-#include "force.h"
 #include "group.h"
 #include "atom_masks.h"
 
@@ -35,7 +34,7 @@ FixDeath::FixDeath(LAMMPS *lmp, int narg, char **arg) :
   idead = group->find(arg[3]);
   if (idead < 0)
     error->all(FLERR, "Can't find group");
-  diameter = force->numeric(FLERR, arg[4]);
+  diameter = utils::numeric(FLERR,arg[4],true,lmp);
 }
 
 /* ---------------------------------------------------------------------- */

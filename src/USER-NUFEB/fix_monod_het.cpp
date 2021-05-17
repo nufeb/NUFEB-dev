@@ -16,7 +16,6 @@
 #include <cmath>
 #include "fix_monod_het.h"
 #include "atom.h"
-#include "force.h"
 #include "error.h"
 #include "grid.h"
 #include "group.h"
@@ -59,45 +58,45 @@ FixMonodHET::FixMonodHET(LAMMPS *lmp, int narg, char **arg) :
   isub = grid->find(arg[3]);
   if (isub < 0)
     error->all(FLERR, "Can't find substrate name");
-  sub_affinity = force->numeric(FLERR, arg[4]);
+  sub_affinity = utils::numeric(FLERR,arg[4],true,lmp);
 
   io2 = grid->find(arg[5]);
   if (io2 < 0)
     error->all(FLERR, "Can't find substrate name");
-  o2_affinity = force->numeric(FLERR, arg[6]);
+  o2_affinity = utils::numeric(FLERR,arg[6],true,lmp);
 
   ino2 = grid->find(arg[7]);
   if (ino2 < 0)
     error->all(FLERR, "Can't find substrate name");
-  no2_affinity = force->numeric(FLERR, arg[8]);
+  no2_affinity = utils::numeric(FLERR,arg[8],true,lmp);
 
   ino3 = grid->find(arg[9]);
   if (ino3 < 0)
     error->all(FLERR, "Can't find substrate name");
-  no3_affinity = force->numeric(FLERR, arg[10]);
+  no3_affinity = utils::numeric(FLERR,arg[10],true,lmp);
   
   int iarg = 11;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "growth") == 0) {
-      growth = force->numeric(FLERR, arg[iarg+1]);
+      growth = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "yield") == 0) {
-      yield = force->numeric(FLERR, arg[iarg+1]);
+      yield = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "maintain") == 0) {
-      maintain = force->numeric(FLERR, arg[iarg+1]);
+      maintain = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "decay") == 0) {
-      decay = force->numeric(FLERR, arg[iarg+1]);
+      decay = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "epsyield") == 0) {
-      eps_yield = force->numeric(FLERR, arg[iarg+1]);
+      eps_yield = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "anoxic") == 0) {
-      anoxic = force->numeric(FLERR, arg[iarg+1]);
+      anoxic = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "epsdens") == 0) {
-      eps_dens = force->numeric(FLERR, arg[iarg+1]);
+      eps_dens = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else {
       error->all(FLERR, "Illegal fix nufeb/monod/het command");

@@ -81,6 +81,8 @@ compute press all pressure NULL pair vol v_one
 variable press equal "(c_ke + c_press) / (3.0 * c_vol)" 
 variable mass equal "mass(all)"
 
+compute mycon all nufeb/ave_conc
+
 # file output
 dump du1 all vtk 10 dump*.vtu id type diameter
 dump du2 all grid/vtk 10 dump_%_*.vti con rea den gro

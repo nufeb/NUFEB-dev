@@ -27,12 +27,12 @@ using namespace LAMMPS_NS;
 
 GridVecReactor::GridVecReactor(LAMMPS *lmp) : GridVec(lmp)
 {
-  mask = NULL;
-  conc = NULL;
-  reac = NULL;
-  dens = NULL;
-  growth = NULL;
-  bulk = NULL;
+  mask = nullptr;
+  conc = nullptr;
+  reac = nullptr;
+  dens = nullptr;
+  growth = nullptr;
+  bulk = nullptr;
   grid->reactor_flag = 1;
 }
 
@@ -129,7 +129,7 @@ void GridVecReactor::set(int narg, char **arg)
   if (narg != 4) error->all(FLERR, "Invalid grid_modify set command");
   int isub = grid->find(arg[1]);
   if (isub < 0) error->all(FLERR,"Cannot find substrate name");
-  set_reactor(isub, force->numeric(FLERR, arg[2]), force->numeric(FLERR, arg[3]));
+  set_reactor(isub, utils::numeric(FLERR,arg[2],true,lmp), utils::numeric(FLERR,arg[3],true,lmp));
 }
 
 /* ---------------------------------------------------------------------- */

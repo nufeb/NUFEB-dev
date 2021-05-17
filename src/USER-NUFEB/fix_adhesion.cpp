@@ -37,13 +37,14 @@ FixAdhesion::FixAdhesion(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR, "Illegal fix nufeb/adhesion command");
 
   virial_flag = 1;
-  ah = NULL;
   smin = 0.0;
   smax = 0.0;
   allocated = 0;
 
-  smin = atof(arg[3]);
-  smax = atof(arg[4]);
+  ah = nullptr;
+
+  smin = utils::numeric(FLERR,arg[3],true,lmp);
+  smax = utils::numeric(FLERR,arg[4],true,lmp);
   if (smin > smax)
     error->all(FLERR, "Illegal value for smin/smax parameters in fix nufeb/adhesion");
 }
@@ -65,10 +66,10 @@ int FixAdhesion::modify_param(int narg, char **arg)
       if (!allocated) allocate();
 
       int ilo,ihi,jlo,jhi;
-      force->bounds(FLERR,arg[iarg+1],atom->ntypes,ilo,ihi);
-      force->bounds(FLERR,arg[iarg+2],atom->ntypes,jlo,jhi);
+      utils::bounds(FLERR,arg[iarg+1],1,atom->ntypes,ilo,ihi,error);
+      utils::bounds(FLERR,arg[iarg+2],1,atom->ntypes,jlo,jhi,error);
 
-      double ah_one = force->numeric(FLERR,arg[iarg+3]);
+      double ah_one = utils::numeric(FLERR,arg[iarg+3],true,lmp);
 
       int count = 0;
       for (int i = ilo; i <= ihi; i++) {

@@ -89,38 +89,38 @@ NufebRun::NufebRun(LAMMPS *lmp, int narg, char **arg) :
   nfix_reactor = 0;
   nfix_property = 0;
   
-  fix_density = NULL;
-  fix_monod = NULL;
-  fix_diffusion = NULL;
-  comp_pressure = NULL;
-  comp_ke = NULL;
-  comp_volume = NULL;
-  fix_eps_extract = NULL;
-  fix_divide = NULL;
-  fix_death = NULL;
-  fix_property = NULL;
+  fix_density = nullptr;
+  fix_monod = nullptr;
+  fix_diffusion = nullptr;
+  comp_pressure = nullptr;
+  comp_ke = nullptr;
+  comp_volume = nullptr;
+  fix_eps_extract = nullptr;
+  fix_divide = nullptr;
+  fix_death = nullptr;
+  fix_property = nullptr;
 
   profile = NULL;
   
   int iarg = 0;
   while (iarg < narg) {
     if (strcmp(arg[iarg], "diffdt") == 0) {
-      diffdt = force->numeric(FLERR, arg[iarg+1]);
+      diffdt = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "difftol") == 0) {
-      difftol = force->numeric(FLERR, arg[iarg+1]);
+      difftol = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "diffmax") == 0) {
-      diffmax = force->inumeric(FLERR, arg[iarg+1]);
+      diffmax = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "pairdt") == 0) {
-      pairdt = force->numeric(FLERR, arg[iarg+1]);
+      pairdt = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "pairtol") == 0) {
-      pairtol = force->numeric(FLERR, arg[iarg+1]);
+      pairtol = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "pairmax") == 0) {
-      pairmax = force->inumeric(FLERR, arg[iarg+1]);
+      pairmax = utils::numeric(FLERR,arg[iarg+1],true,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg], "profile") == 0) {
       char filename[80];

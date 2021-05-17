@@ -16,7 +16,6 @@
 #include <cmath>
 #include "fix_diffusion_reaction.h"
 #include "atom.h"
-#include "force.h"
 #include "update.h"
 #include "respa.h"
 #include "error.h"
@@ -45,9 +44,9 @@ FixDiffusionReaction::FixDiffusionReaction(LAMMPS *lmp, int narg, char **arg) :
   closed_system = 0;
 
   ncells = 0;
-  prev = NULL;
-  penult = NULL;
   dt = 1.0;
+  prev = nullptr;
+  penult = nullptr;
   
   boundary[0] = boundary[1] = boundary[2] = boundary[3] =
   boundary[4] = boundary[5] = -1;
@@ -56,7 +55,7 @@ FixDiffusionReaction::FixDiffusionReaction(LAMMPS *lmp, int narg, char **arg) :
   if (isub < 0)
     error->all(FLERR, "Can't find substrate for nufeb/diffusion_reaction");
 
-  diff_coef = force->numeric(FLERR, arg[4]);
+  diff_coef = utils::numeric(FLERR,arg[4],true,lmp);
 
   int ndirichlet = 0;
   int nbulk = 0;
@@ -93,7 +92,7 @@ FixDiffusionReaction::FixDiffusionReaction(LAMMPS *lmp, int narg, char **arg) :
   int iarg = 8;
   for (int i = 0; i < 6; i++) {
     if (boundary[i] == DIRICHLET) {
-      dirichlet[i] = force->numeric(FLERR, arg[iarg++]);
+      dirichlet[i] = utils::numeric(FLERR,arg[iarg++],true,lmp);
     } else {
       dirichlet[i] = 0.0;
     }
