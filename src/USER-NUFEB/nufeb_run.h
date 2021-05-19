@@ -52,6 +52,7 @@ class NufebRun : public Integrate {
   double pairdt;
   double pairtol;
   int pairmax;
+  int info;
   
   int nfix_monod;
   int nfix_diffusion;
