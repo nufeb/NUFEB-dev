@@ -1357,6 +1357,8 @@
 /fix_property_cycletime.h
 /fix_property_generation.cpp
 /fix_property_generation.h
+/fix_property_plasmid.cpp
+/fix_property_plasmid.h
 /fix_reactor.cpp
 /fix_reactor.h
 /fix_reactor_solute_balance.cpp
