@@ -165,11 +165,11 @@ void FixGasLiquid::compute()
 
   for (int i = 0; i < grid->ncells; i++) {
     if (!(grid->mask[i] & GHOST_MASK)) {
-      p_g2l = kga * (grid->bulk[igas] - conc[iliquid][i]/(h * mw));
-      n_l2g = -p_g2l * reactor_vhead / (rg * temp);
+      p_g2l = kga * (conc[iliquid][i]/(h * mw) - grid->bulk[igas]);
+      n_l2g = -p_g2l / (rg * temp);
       // update reaction rates
       reac[igas][i] += p_g2l;
-      reac[iliquid][i] += n_l2g * mw / vol;
+      reac[iliquid][i] += n_l2g * mw;
     }
   }
 }
