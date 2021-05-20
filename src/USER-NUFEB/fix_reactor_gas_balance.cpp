@@ -39,12 +39,12 @@ FixReactorGasBalance::FixReactorGasBalance(LAMMPS *lmp, int narg, char **arg) :
   FixReactor(lmp, narg, arg)
 {
   if (narg < 4)
-    error->all(FLERR,"Illegal reactor/gas_balance command");
+    error->all(FLERR,"Illegal fix nufeb/reactor/gas_balance command");
 
   igas = -1;
 
-  q = 0.0;
   reactor_vhead = 1.0;
+  reactor_pres = 1.0;
 
   nfix_gas_liquid = 0;
   fix_gas_liquid = NULL;
@@ -60,6 +60,13 @@ FixReactorGasBalance::FixReactorGasBalance(LAMMPS *lmp, int narg, char **arg) :
       if (reactor_vhead <= 0)
 	error->all(FLERR, "Reactor headspace volume (reactor_vhead) must be positive");
       iarg += 2;
+    } else if (strcmp(arg[iarg], "reactor_pres") == 0) {
+      reactor_pres = force->numeric(FLERR, arg[iarg+1]);
+      if (reactor_pres <= 0)
+	error->all(FLERR, "Reactor headspace pressure (reactor_pres) must be positive");
+      iarg += 2;
+    } else {
+      error->all(FLERR, "Illegal fix nufeb/reactor/gas_balance command");
     }
   }
 }
@@ -103,23 +110,32 @@ void FixReactorGasBalance::compute()
 {
   double **reac = grid->reac;
   double *bulk = grid->bulk;
-  double sum_reac, ncells;
+  double vol = grid->cell_size * grid->cell_size * grid->cell_size;
+  double sum_reac, q;
 
-  for (int i = 0; i < nfix_gas_liquid; i++)
-    q += fix_gas_liquid[i]->compute_scalar();
+  q = 0.0;
 
-  sum_reac = 0;
-  ncells = 0;
+  for (int i = 0; i < nfix_gas_liquid; i++) {
+    double subq = 0.0;
+    int j = fix_gas_liquid[i]->igas;
+
+    for (int i = 0; i < grid->ncells; i++) {
+      if (!(grid->mask[i] & GHOST_MASK)) {
+	subq += grid->reac[j][i];
+      }
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &subq, 1, MPI_DOUBLE, MPI_SUM, world);
+    q += (subq * vol / reactor_pres);
+  }
+
+  sum_reac = 0.0;
 
   for (int i = 0; i < grid->ncells; i++) {
     if (!(grid->mask[i] & GHOST_MASK)) {
       sum_reac += reac[igas][i];
-      ncells++;
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &sum_reac, 1, MPI_DOUBLE, MPI_SUM, world);
-  MPI_Allreduce(MPI_IN_PLACE, &ncells, 1, MPI_INT, MPI_SUM, world);
 
-  bulk[igas] += (sum_reac / ncells - (q / reactor_vhead * bulk[igas])) * update->dt;
-
+  bulk[igas] += (sum_reac * vol / reactor_vhead  - (q / reactor_vhead * bulk[igas])) * update->dt;
 }

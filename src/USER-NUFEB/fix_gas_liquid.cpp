@@ -37,7 +37,6 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR,"Fix reactor requires nufeb/reactor grid style");
 
   compute_flag = 1;
-  scalar_flag = 1;
 
   iliquid = -1;
   igas = -1;
@@ -45,8 +44,6 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
   kga = 0.0;
   h = 1.0;
   temp = 1.0;
-  reactor_vhead = 1.0;
-  reactor_pres = 1.0;
   mw = 1.0;
   rg = 1.0;
 
@@ -72,16 +69,6 @@ FixGasLiquid::FixGasLiquid(LAMMPS *lmp, int narg, char **arg) :
       temp = force->numeric(FLERR, arg[iarg+1]);
       if (temp <= 0)
 	error->all(FLERR, "Temperature (temp) must be positive");
-      iarg += 2;
-    } else if (strcmp(arg[iarg], "reactor_vhead") == 0) {
-      reactor_vhead = force->numeric(FLERR, arg[iarg+1]);
-      if (reactor_vhead <= 0)
-	error->all(FLERR, "Reactor headspace volume (reactor_vhead) must be positive");
-      iarg += 2;
-    } else if (strcmp(arg[iarg], "reactor_pres") == 0) {
-      reactor_pres = force->numeric(FLERR, arg[iarg+1]);
-      if (reactor_pres <= 0)
-	error->all(FLERR, "Reactor headspace pressure (reactor_pres) must be positive");
       iarg += 2;
     } else if (strcmp(arg[iarg], "rg") == 0) {
       rg = force->numeric(FLERR, arg[iarg+1]);
@@ -138,24 +125,6 @@ void FixGasLiquid::post_integrate()
 
 /* ---------------------------------------------------------------------- */
 
-double FixGasLiquid::compute_scalar()
-{
-  double result = 0.0;
-
-  for (int i = 0; i < grid->ncells; i++) {
-    if (!(grid->mask[i] & GHOST_MASK)) {
-      result -= grid->reac[igas][i] * reactor_vhead;
-    }
-  }
-  MPI_Allreduce(MPI_IN_PLACE, &result, 1, MPI_DOUBLE, MPI_SUM, world);
-  result /= reactor_pres;
-
-  return result;
-}
-
-
-/* ---------------------------------------------------------------------- */
-
 void FixGasLiquid::compute()
 {
   double **conc = grid->conc;
@@ -173,3 +142,5 @@ void FixGasLiquid::compute()
     }
   }
 }
+
+

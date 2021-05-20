@@ -34,7 +34,7 @@ FixReactorSoluteBalance::FixReactorSoluteBalance(LAMMPS *lmp, int narg, char **a
   FixReactor(lmp, narg, arg)
 {
   if (narg < 4)
-    error->all(FLERR,"Illegal fix reactor/solute_balance command");
+    error->all(FLERR,"Illegal fix nufeb/reactor/solute_balance command");
 
   iliq = -1;
 
@@ -71,7 +71,7 @@ FixReactorSoluteBalance::FixReactorSoluteBalance(LAMMPS *lmp, int narg, char **a
       } else if (strcmp(arg[iarg+1],"xz") == 0) {
 	domain_af = (domain->boxhi[0] - domain->boxlo[0]) * (domain->boxhi[2] - domain->boxlo[2]);
       } else
-	 error->all(FLERR,"Illegal fix reactor/solute_balance command");
+	 error->all(FLERR,"Illegal fix nufeb/reactor/solute_balance command");
       iarg += 2;
     }
   }

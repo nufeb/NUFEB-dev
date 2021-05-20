@@ -27,24 +27,20 @@ namespace LAMMPS_NS {
 class FixGasLiquid : public Fix {
  public:
   int compute_flag;
+  int iliquid;
+  int igas;
 
   FixGasLiquid(class LAMMPS *, int, char **);
   ~FixGasLiquid() {}
   int modify_param(int, char **);
   int setmask();
   void post_integrate();
-  double compute_scalar();
   void compute();
 
  protected:
-  int iliquid;
-  int igas;
-
   double kga;
   double h;
   double temp;
-  double reactor_vhead;
-  double reactor_pres;
   double mw;
   double rg;
 };
