@@ -94,7 +94,7 @@ void FixReactorGasBalance::init()
 }
 
 /* ----------------------------------------------------------------------
-   return gas concentration in bulk
+   return gas pressure in bulk
 ------------------------------------------------------------------------- */
 
 double FixReactorGasBalance::compute_scalar()
@@ -103,7 +103,7 @@ double FixReactorGasBalance::compute_scalar()
 }
 
 /* ----------------------------------------------------------------------
-   update gas concentration in bulk
+   update gas pressure in bulk
 ------------------------------------------------------------------------- */
 
 void FixReactorGasBalance::compute()
@@ -113,7 +113,7 @@ void FixReactorGasBalance::compute()
   double vol = grid->cell_size * grid->cell_size * grid->cell_size;
   double sum_reac, q;
 
-  q = 0.0;
+  q = sum_reac = 0.0;
 
   for (int i = 0; i < nfix_gas_liquid; i++) {
     double subq = 0.0;
@@ -127,8 +127,6 @@ void FixReactorGasBalance::compute()
     MPI_Allreduce(MPI_IN_PLACE, &subq, 1, MPI_DOUBLE, MPI_SUM, world);
     q += (subq * vol / reactor_pres);
   }
-
-  sum_reac = 0.0;
 
   for (int i = 0; i < grid->ncells; i++) {
     if (!(grid->mask[i] & GHOST_MASK)) {
