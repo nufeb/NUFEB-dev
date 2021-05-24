@@ -48,6 +48,7 @@ class NufebRunKokkos : public NufebRun {
 
   void force_clear();
   void growth();
+  void reactor();
   int diffusion();
   void disable_sync(class Fix *fix);
 };
