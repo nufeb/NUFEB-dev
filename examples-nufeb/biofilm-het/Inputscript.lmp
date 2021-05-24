@@ -82,15 +82,15 @@ variable press equal "(c_ke + c_press) / (3.0 * c_vol)"
 variable mass equal "mass(all)"
 
 # file output
-dump du1 all vtk 10 dump*.vtu id type diameter
-dump du2 all grid/vtk 10 dump_%_*.vti con rea den gro
+#dump du1 all vtk 10 dump*.vtu id type diameter
+#dump du2 all grid/vtk 10 dump_%_*.vti con rea den gro
 #dump du3 all nufeb/hdf5 10 dump.h5 id type x y z vx vy vz fx fy fz radius conc reac 
 
 # thermo output
-thermo_style custom step atoms v_press v_mass
+thermo_style custom step cpu atoms v_press v_mass
 thermo 1
 
 # issue run command
-run_style nufeb diffdt 1e-4 difftol 1e-6 pairdt 1e-2 pairtol 1 pairmax 1000 diffmax 1000
+run_style nufeb diffdt 1e-4 difftol 1e-6 pairdt 1e-2 pairtol 1 pairmax 1000 diffmax 5000
 timestep 1000
 run 800
