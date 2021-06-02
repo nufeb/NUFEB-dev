@@ -1012,7 +1012,7 @@ void Set::set(int keyword)
     }
 
     else if (keyword == BIOMASS) {
-      if (dvalue < 0 | dvalue > 0) error->one(FLERR,"Invalid biomass in set command");
+      if (dvalue < 0 || dvalue > 1) error->one(FLERR,"Invalid biomass in set command");
       if (atom->rmass_flag)
 	atom->biomass[i] = atom->rmass[i] * dvalue;
     }
