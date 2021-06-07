@@ -333,7 +333,7 @@ int AtomVecCoccusKokkos::pack_comm_kokkos(
       }
     }
   } else {
-    sync(Device,X_MASK|RADIUS_MASK|RMASS_MASK|
+    sync(Device,X_MASK|RADIUS_MASK|RMASS_MASK|BIOMASS_MASK|
 	 OUTER_RADIUS_MASK|OUTER_MASS_MASK);
     if(pbc_flag) {
       if(domain->triclinic) {
@@ -657,7 +657,7 @@ int AtomVecCoccusKokkos::pack_comm_vel_kokkos(
       }
     }
   } else {
-    sync(Device,X_MASK|RADIUS_MASK|RMASS_MASK|
+    sync(Device,X_MASK|RADIUS_MASK|RMASS_MASK|BIOMASS_MASK|
 	 OUTER_RADIUS_MASK|OUTER_MASS_MASK|V_MASK|OMEGA_MASK);
     if(pbc_flag) {
       if(deform_vremap) {
@@ -3049,7 +3049,7 @@ void AtomVecCoccusKokkos::pack_data(double **buf)
 
 int AtomVecCoccusKokkos::pack_data_hybrid(int i, double *buf)
 {
-  atomKK->sync(Host,RADIUS_MASK|RMASS_MASK);
+  atomKK->sync(Host,RADIUS_MASK|RMASS_MASK|BIOMASS_MASK|OUTER_RADIUS_MASK);
 
   buf[0] = 2.0*h_radius[i];
   if (h_radius[i] == 0.0) buf[1] = h_rmass[i];
