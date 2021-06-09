@@ -71,6 +71,7 @@ fi
 if (test $1 = "GRANULAR") then
   depend KOKKOS
   depend USER-OMP
+  depend USER-NUFEB
 fi
 
 if (test $1 = "KSPACE") then
@@ -142,4 +143,8 @@ fi
 if (test $1 = "USER-REAXC") then
   depend KOKKOS
   depend USER-OMP
+fi
+
+if (test $1 = "USER-NUFEB") then
+  depend KOKKOS
 fi
