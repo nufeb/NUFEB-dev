@@ -115,7 +115,7 @@ void CommGridKokkos::forward_comm_device()
   }
   for (int p = 0; p < nsendproc; p++) {
     int n = gvec->pack_comm_kokkos(send_begin[p], send_end[p], k_send_cells, k_buf_send);
-    DeviceType::fence();
+    DeviceType().fence();
     MPI_Send(k_buf_send.view<DeviceType>().data() + send_begin[p] * size_forward, n, MPI_DOUBLE, sendproc[p], 0, world);
   }
   MPI_Waitall(nrecvproc, requests, MPI_STATUS_IGNORE);

@@ -33,9 +33,6 @@ using namespace MathConst;
 FixMonodEcoliWild::FixMonodEcoliWild(LAMMPS *lmp, int narg, char **arg) :
   FixMonod(lmp, narg, arg)
 {
-  avec = nullptr;
-  avec = (AtomVecBacillus *) atom->style_match("bacillus");
-
   if (narg < 8)
     error->all(FLERR, "Illegal fix nufeb/monod/ecoliw command");
 
@@ -52,6 +49,8 @@ FixMonodEcoliWild::FixMonodEcoliWild(LAMMPS *lmp, int narg, char **arg) :
   yield = 1.0;
   maintain = 0.0;
   decay = 0.0;
+
+  avec = NULL;
 
   isuc = grid->find(arg[3]);
   if (isuc < 0)
@@ -89,6 +88,8 @@ FixMonodEcoliWild::FixMonodEcoliWild(LAMMPS *lmp, int narg, char **arg) :
       error->all(FLERR, "Illegal fix nufeb/monod/ecoliw command");
     }
   }
+
+  avec = (AtomVecBacillus *) atom->style_match("bacillus");
 }
 
 /* ---------------------------------------------------------------------- */
@@ -126,7 +127,6 @@ void FixMonodEcoliWild::update_cells()
       reac[isuc][i] -= 1 / yield * tmp1 * dens[igroup][i];
       reac[io2][i] -= 0.399 * (tmp1 + tmp2) * dens[igroup][i];
       reac[ico2][i] += 0.2 * (tmp1 + tmp2) * dens[igroup][i];
-      if (reac[isuc][i] > 0) printf("%e \n", reac[isuc][i]);
     }
 
     if (Growth) {

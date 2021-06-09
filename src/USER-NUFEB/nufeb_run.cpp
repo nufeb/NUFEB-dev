@@ -69,6 +69,7 @@ NufebRun::NufebRun(LAMMPS *lmp, int narg, char **arg) :
   Integrate(lmp, narg, arg)
 {
   init_diff_flag = true;
+  info = true;
   ndiff = 0;
   npair = 0;
 
@@ -126,6 +127,13 @@ NufebRun::NufebRun(LAMMPS *lmp, int narg, char **arg) :
       char filename[80];
       sprintf(filename, "%s_%d.log", arg[iarg+1], comm->me);
       profile = fopen(filename,"w");
+      iarg += 2;
+    } else if (strcmp(arg[iarg], "screen") == 0) {
+      if (strcmp(arg[iarg+1], "yes") == 0) info = true;
+      else if (strcmp(arg[iarg+1], "no") == 0) info = false;
+      else {
+	error->all(FLERR, "Illegal run_style nufeb command");
+      }
       iarg += 2;
     } else if (strcmp(arg[iarg], "initdiff") == 0) {
       if (strcmp(arg[iarg+1], "yes") == 0) init_diff_flag = true;
@@ -609,7 +617,7 @@ void NufebRun::run(int n)
     } while(fabs(press) > pairtol && ((pairmax > 0) ? npair < pairmax : true));
     if (profile)
       fprintf(profile, "%d %e ", npair, get_time()-t);
-    if (comm->me == 0) fprintf(screen, "pair interaction: %d steps (pressure %e N/m2)\n", npair, press);
+    if (info && comm->me == 0) fprintf(screen, "pair interaction: %d steps (pressure %e N/m2)\n", npair, press);
 
     // update densities
 
@@ -625,7 +633,7 @@ void NufebRun::run(int n)
     ndiff = diffusion();
     if (profile)
       fprintf(profile, "%d %e\n", ndiff, get_time()-t);
-    if (comm->me == 0) fprintf(screen, "diffusion: %d steps\n", ndiff);
+    if (info && comm->me == 0) fprintf(screen, "diffusion: %d steps\n", ndiff);
     
     reactor();
 

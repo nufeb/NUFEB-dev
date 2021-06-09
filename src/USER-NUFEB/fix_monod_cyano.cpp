@@ -149,7 +149,6 @@ void FixMonodCyano::update_cells()
       reac[io2][i] +=  (0.727 / yield) * (tmp1 + tmp3) * dens[igroup][i];
       // sucrose export
       reac[isuc][i] += 0.65 / yield * tmp3 * dens[igroup][i];
-
       // co2 dissolution
       if (gco2_flag == 1)
         reac[ico2][i] += (4.4e-6 * conc[igco2][i]) - (4.4e-6 * conc[ico2][i]);

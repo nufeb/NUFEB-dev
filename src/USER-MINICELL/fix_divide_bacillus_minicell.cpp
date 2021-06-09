@@ -90,7 +90,7 @@ void FixDivideBacillusMinicell::compute()
 
       double imass, jmass, ibiomass, jbiomass;
       double ilen, jlen, xp1[3], xp2[3];
-      int n;
+      int j;
 
       double vsphere = four_thirds_pi * atom->radius[i]*atom->radius[i]*atom->radius[i];
       double acircle = MY_PI*atom->radius[i]*atom->radius[i];
@@ -141,14 +141,14 @@ void FixDivideBacillusMinicell::compute()
 	coord[2] = oldz + (xp2[2] - oldz) * dl;
 
         avec->create_atom(atom->type[i], coord);
-        n = atom->nlocal - 1;
-        atom->bacillus[n] = 0;
-        atom->mask[n] = atom->mask[i];
-        avec->set_bonus(n, bonus->pole1, bonus->diameter, bonus->quat, bonus->inertia);
+        j = atom->nlocal - 1;
+        atom->bacillus[j] = 0;
+        atom->mask[j] = atom->mask[i];
+        avec->set_bonus(j, bonus->pole1, bonus->diameter, bonus->quat, bonus->inertia);
 
         delete[] coord;
-      // abnormal division, generate one sphere (j) and one long rod (i)
       } else {
+	// abnormal division, generate one sphere (j) and one long rod (i)
 	double prob_pole = random->uniform();
 
 	double *coord = new double[3];
@@ -195,32 +195,35 @@ void FixDivideBacillusMinicell::compute()
         }
 
 	avec->create_atom(type, coord);
-	n = atom->nlocal - 1;
-	atom->bacillus[n] = 0;
-	atom->mask[n] = 1 | mini_mask;
+	j = atom->nlocal - 1;
+	atom->bacillus[j] = 0;
+	atom->mask[j] = 1 | mini_mask;
 	pole1[0] = pole1[1] = pole1[2] = 0;
-	avec->set_bonus(n, pole1, bonus->diameter, bonus->quat, bonus->inertia);
+	avec->set_bonus(j, pole1, bonus->diameter, bonus->quat, bonus->inertia);
 	delete[] coord;
       }
-      // set attributes for child
-      atom->tag[n] = 0;
-      atom->v[n][0] = atom->v[i][0];
-      atom->v[n][1] = atom->v[i][1];
-      atom->v[n][2] = atom->v[i][2];
-      atom->f[n][0] = atom->f[i][0];
-      atom->f[n][1] = atom->f[i][1];
-      atom->f[n][2] = atom->f[i][2];
-      atom->torque[n][0] = atom->torque[i][0];
-      atom->torque[n][1] = atom->torque[i][1];
-      atom->torque[n][2] = atom->torque[i][2];
-      atom->angmom[n][0] = atom->angmom[i][0];
-      atom->angmom[n][1] = atom->angmom[i][1];
-      atom->angmom[n][2] = atom->angmom[i][2];
-      atom->rmass[n] = jmass;
-      atom->biomass[n] = jbiomass;
-      atom->radius[n] = atom->radius[i];
+      // set daughter j attributes
+      atom->tag[j] = 0;
+      atom->v[j][0] = atom->v[i][0];
+      atom->v[j][1] = atom->v[i][1];
+      atom->v[j][2] = atom->v[i][2];
+      atom->f[j][0] = atom->f[i][0];
+      atom->f[j][1] = atom->f[i][1];
+      atom->f[j][2] = atom->f[i][2];
+      atom->torque[j][0] = atom->torque[i][0];
+      atom->torque[j][1] = atom->torque[i][1];
+      atom->torque[j][2] = atom->torque[i][2];
+      atom->angmom[j][0] = atom->angmom[i][0];
+      atom->angmom[j][1] = atom->angmom[i][1];
+      atom->angmom[j][2] = atom->angmom[i][2];
+      atom->rmass[j] = jmass;
+      atom->biomass[j] = jbiomass;
+      atom->radius[j] = atom->radius[i];
 
-      modify->create_attribute(n);
+      modify->create_attribute(j);
+
+      for (int m = 0; m < modify->nfix; m++)
+        modify->fix[m]->update_arrays(i, j);
     }
   }
 
@@ -254,7 +257,7 @@ void *FixDivideBacillusMinicell::extract(const char *str, int &itype)
       }
     }
     MPI_Allreduce(MPI_IN_PLACE, &maxradius, 1, MPI_DOUBLE, MPI_MAX, world);
-    printf("maxradius=%e!\n",maxradius);
+
     return &maxradius;
   }
   return NULL;

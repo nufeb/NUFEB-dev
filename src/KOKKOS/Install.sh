@@ -95,6 +95,8 @@ action compute_orientorder_atom_kokkos.cpp
 action compute_orientorder_atom_kokkos.h
 action compute_temp_kokkos.cpp
 action compute_temp_kokkos.h
+action compute_ke_kokkos.cpp
+action compute_ke_kokkos.h
 action compute_volume_kokkos.cpp compute_volume.cpp
 action compute_volume_kokkos.h compute_volume.h
 action dihedral_charmm_kokkos.cpp dihedral_charmm.cpp
@@ -138,6 +140,8 @@ action fix_monod_nob_kokkos.cpp fix_monod_nob.cpp
 action fix_monod_nob_kokkos.h fix_monod_nob.h
 action fix_monod_cyano_kokkos.cpp fix_monod_cyano.cpp
 action fix_monod_cyano_kokkos.h fix_monod_cyano.h
+action fix_monod_ecoli_wild_kokkos.cpp fix_monod_ecoli_wild.cpp
+action fix_monod_ecoli_wild_kokkos.h fix_monod_ecoli_wild.h
 action fix_minimize_kokkos.cpp
 action fix_minimize_kokkos.h
 action fix_neigh_history_kokkos.cpp
@@ -176,14 +180,14 @@ action fix_wall_lj93_kokkos.cpp
 action fix_wall_lj93_kokkos.h
 action fix_wall_reflect_kokkos.cpp
 action fix_wall_reflect_kokkos.h
+action fix_wall_gran_kokkos.cpp
+action fix_wall_gran_kokkos.h
 action fix_dpd_energy_kokkos.cpp fix_dpd_energy.cpp
 action fix_dpd_energy_kokkos.h fix_dpd_energy.h
 action fix_rx_kokkos.cpp fix_rx.cpp
 action fix_rx_kokkos.h fix_rx.h
 action fix_wall_gran_kokkos.cpp fix_wall_gran.cpp
 action fix_wall_gran_kokkos.h fix_wall_gran.h
-action gridcomm_kokkos.cpp gridcomm.cpp
-action gridcomm_kokkos.h gridcomm.h
 action grid_kokkos.cpp grid.cpp
 action grid_kokkos.h grid.h
 action grid_vec_kokkos.cpp grid_vec.cpp

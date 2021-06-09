@@ -36,8 +36,8 @@ class FixReactorGasBalance : public FixReactor {
  protected:
   int igas;
 
-  double q;
   double reactor_vhead;
+  double reactor_pres;
   int nfix_gas_liquid;
 
   class FixGasLiquid **fix_gas_liquid;

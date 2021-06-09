@@ -33,16 +33,6 @@ NPairStyle(full/bin/ghost/kk/device,
            NPairKokkosFullBinGhostDevice,
            NP_FULL | NP_BIN | NP_KOKKOS_DEVICE | NP_NEWTON | NP_NEWTOFF | NP_GHOST | NP_ORTHO | NP_TRI)
 
-typedef NPairKokkos<LMPHostType,0,0,0,1> NPairKokkosFullSizeBinHost;
-NPairStyle(full/size/bin/kk/host,
-           NPairKokkosFullSizeBinHost,
-           NP_FULL | NP_SIZE | NP_BIN | NP_KOKKOS_HOST | NP_NEWTON | NP_NEWTOFF | NP_ORTHO)
-
-typedef NPairKokkos<LMPDeviceType,0,0,0,1> NPairKokkosFullSizeBinDevice;
-NPairStyle(full/size/bin/kk/device,
-           NPairKokkosFullSizeBinDevice,
-           NP_FULL | NP_SIZE | NP_BIN | NP_KOKKOS_DEVICE | NP_NEWTON | NP_NEWTOFF | NP_ORTHO)
-
 typedef NPairKokkos<LMPHostType,1,0,0,0> NPairKokkosHalfBinHost;
 NPairStyle(half/bin/kk/host,
            NPairKokkosHalfBinHost,

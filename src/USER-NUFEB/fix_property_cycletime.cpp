@@ -28,7 +28,7 @@ using namespace FixConst;
 FixPropertyCycletime::FixPropertyCycletime(LAMMPS *lmp, int narg, char **arg) :
   FixProperty(lmp, narg, arg)
 {
-  if (narg < 3) error->all(FLERR,"Illegal fix property/nufeb/cycletime command");
+  if (narg < 3) error->all(FLERR,"Illegal fix nufeb/property/cycletime command");
 
   create_attribute = 1;
   compute_flag = 1;

@@ -42,6 +42,7 @@ class FixNVEKokkos : public FixNVE {
   FixNVEKokkos(class LAMMPS *, int, char **);
   ~FixNVEKokkos() {}
   void cleanup_copy();
+  void init();
   void initial_integrate(int);
   void final_integrate();
 
@@ -55,6 +56,8 @@ class FixNVEKokkos : public FixNVE {
   void final_integrate_rmass_item(int) const;
 
  private:
+
+
   typename ArrayTypes<DeviceType>::t_x_array x;
   typename ArrayTypes<DeviceType>::t_v_array v;
   typename ArrayTypes<DeviceType>::t_f_array_const f;

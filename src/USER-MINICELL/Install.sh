@@ -29,5 +29,7 @@ action () {
 # package files without dependencies
 action fix_divide_bacillus_minicell.cpp
 action fix_divide_bacillus_minicell.h
+action fix_property_plasmid.cpp
+action fix_property_plasmid.h
 
 # package files with dependencies

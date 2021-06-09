@@ -90,7 +90,9 @@ namespace MathExtra {
   void richardson(double *q, double *m, double *w, double *moments, double dtq);
   void no_squish_rotate(int k, double *p, double *q, double *inertia,
                         double dt);
-
+  int jacobi(double matrix[3][3], double *evalues, double evectors[3][3]);
+  void rotate(double matrix[3][3], int i, int j, int k, int l,
+              double s, double tau);
   // shape matrix operations
   // upper-triangular 3x3 matrix stored in Voigt notation as 6-vector
 

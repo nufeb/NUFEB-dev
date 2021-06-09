@@ -70,7 +70,7 @@ variable mass equal "mass(all)"
 variable ncyano equal "count(CYANO)"
 variable necoli equal "count(ECW)"
 
-compute mycon all avg_con
+compute mycon all nufeb/ave_conc
 
 ##############Simulation exit condition##############
 variable co2 equal c_mycon[4]

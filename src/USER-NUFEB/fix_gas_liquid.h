@@ -27,26 +27,22 @@ namespace LAMMPS_NS {
 class FixGasLiquid : public Fix {
  public:
   int compute_flag;
+  int iliquid;
+  int igas;
 
   FixGasLiquid(class LAMMPS *, int, char **);
   ~FixGasLiquid() {}
   int modify_param(int, char **);
   int setmask();
   void post_integrate();
-  double compute_scalar();
   void compute();
 
  protected:
-  int iliquid;
-  int igas;
-
-  double kga;
-  double h;
-  double temp;
-  double reactor_vhead;
-  double reactor_pres;
-  double mw;
-  double rg;
+  double kga;   // gas mass transfer rate s-1
+  double h;	// Henry's solubility constant - mol m-3 Pa-1
+  double temp;  // temperature - K
+  double mw;	// molar mass - kg/mol
+  double rg;   	// ideal gas constant - m3 Pa K-1 mol-1
 };
 
 }

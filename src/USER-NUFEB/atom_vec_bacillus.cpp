@@ -21,7 +21,6 @@
 #include "modify.h"
 #include "math_const.h"
 #include "math_extra.h"
-#include "math_eigen.h"
 
 #include <cstring>
 
@@ -66,7 +65,7 @@ AtomVecBacillus::AtomVecBacillus(LAMMPS *lmp) : AtomVec(lmp)
   fields_copy = (char *) "radius rmass angmom biomass";
   fields_comm = (char *) "rmass biomass";
   fields_comm_vel = (char *) "angmom rmass biomass";
-  fields_reverse = (char *) "torque biomass";
+  fields_reverse = (char *) "torque";
   fields_border = (char *) "radius rmass biomass";
   fields_border_vel = (char *) "radius rmass angmom biomass";
   fields_exchange = (char *) "radius rmass angmom biomass";
@@ -517,7 +516,7 @@ void AtomVecBacillus::data_atom_bonus(int m, char **values)
 
   double *inertia = bonus[nlocal_bonus].inertia;
   double evectors[3][3];
-  int ierror = MathEigen::jacobi3(tensor,inertia,evectors);
+  int ierror = MathExtra::jacobi(tensor,inertia,evectors);
   if (ierror) error->one(FLERR,
                          "Insufficient Jacobi rotations for bacillus");
 
@@ -788,7 +787,4 @@ void AtomVecBacillus::get_pole_coords(int m, double *xp1, double *xp2)
   xp2[0] += x[0];
   xp2[1] += x[1];
   xp2[2] += x[2];
-//  printf("after %e %e %e %e\n", xp1[2],  xp2[2], bonus[bacillus[m]].pole1[2], bonus[bacillus[m]].pole2[2]);
-//  printf("!!%e %e %e %e\n", bonus[bacillus[m]].quat[0],bonus[bacillus[m]].quat[1]
-//			   ,bonus[bacillus[m]].quat[2],bonus[bacillus[m]].quat[3]);
 }

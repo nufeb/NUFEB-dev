@@ -50,6 +50,9 @@
 #include "fix_eps_extract.h"
 #include "fix_divide.h"
 #include "fix_death.h"
+#include "fix_reactor.h"
+#include "fix_gas_liquid.h"
+#include "fix_property.h"
 #include "compute_volume.h"
 
 using namespace LAMMPS_NS;
@@ -112,6 +115,9 @@ void NufebRunKokkos::init()
   fix_eps_extract = new FixEPSExtract*[modify->nfix];
   fix_divide = new FixDivide*[modify->nfix];
   fix_death = new FixDeath*[modify->nfix];
+  fix_reactor = new FixReactor*[modify->nfix];
+  fix_gas_liquid = new FixGasLiquid*[modify->nfix];
+  fix_property = new FixProperty*[modify->nfix];
 
   // find fixes
   for (int i = 0; i < modify->nfix; i++) {
@@ -125,6 +131,12 @@ void NufebRunKokkos::init()
       fix_divide[nfix_divide++] = (FixDivide *)modify->fix[i];
     } else if (strstr(modify->fix[i]->style, "nufeb/death")) {
       fix_death[nfix_death++] = (FixDeath *)modify->fix[i];
+    } else if (strstr(modify->fix[i]->style, "nufeb/reactor")) {
+      fix_reactor[nfix_reactor++] = (FixReactor *)modify->fix[i];
+    } else if (strstr(modify->fix[i]->style, "nufeb/gas_liquid")) {
+      fix_gas_liquid[nfix_gas_liquid++] = (FixGasLiquid *)modify->fix[i];
+    } else if (strstr(modify->fix[i]->style, "nufeb/property")) {
+      fix_property[nfix_property++] = (FixProperty *)modify->fix[i];
     }
   }
 
@@ -325,14 +337,16 @@ void NufebRunKokkos::setup(int flag)
     fix_death[i]->compute_flag = 0;
     disable_sync(fix_death[i]);
   }
-
-  atomKK->sync(Host,ALL_MASK);
+  for (int i = 0; i < nfix_reactor; i++)
+    fix_reactor[i]->compute_flag = 0;
+  for (int i = 0; i < nfix_gas_liquid; i++)
+    fix_gas_liquid[i]->compute_flag = 0;
+  for (int i = 0; i < nfix_property; i++)
+    fix_property[i]->compute_flag = 0;
 
   // compute density
   fix_density->compute();
 
-  gridKK->modified(Host,ALL_MASK);
-  
   // run diffusion until it reaches steady state
   if (init_diff_flag) {
     int niter = diffusion();
@@ -342,8 +356,6 @@ void NufebRunKokkos::setup(int flag)
     if (comm->me == 0)
       fprintf(screen, "Initial diffusion reaction convergence disabled\n");
   }
-
-  atomKK->modified(Host,ALL_MASK);
 }
 
 /* ----------------------------------------------------------------------
@@ -747,9 +759,7 @@ void NufebRunKokkos::run(int n)
     // update densities
 
     t = get_time();
-    atomKK->sync(Host,ALL_MASK);
     fix_density->compute();
-    gridKK->modified(Host,DENS_MASK);
     if (profile)
       fprintf(profile, "%e ", get_time()-t);
 
@@ -863,6 +873,10 @@ void NufebRunKokkos::growth()
   for (int i = 0; i < nfix_death; i++) {
     fix_death[i]->compute();
   }
+
+  for (int i = 0; i < nfix_property; i++) {
+    fix_property[i]->compute();
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -900,15 +914,14 @@ int NufebRunKokkos::diffusion()
       if (!converge[i])
 	fix_diffusion[i]->compute_initial();
     }
-
-    // gridKK->sync(Host, CONC_MASK);
-    // gridKK->sync(Host, REAC_MASK);
     
     for (int i = 0; i < nfix_monod; i++) {
       fix_monod[i]->compute();
     }
 
-    // gridKK->modified(Host, REAC_MASK);
+    for (int i = 0; i < nfix_gas_liquid; i++) {
+      fix_gas_liquid[i]->compute();
+    }
 
     for (int i = 0; i < nfix_diffusion; i++) {
       if (!converge[i]) {
@@ -932,6 +945,22 @@ int NufebRunKokkos::diffusion()
   }
 
   return niter;
+}
+
+/* ---------------------------------------------------------------------- */
+
+void NufebRunKokkos::reactor()
+{
+  // set biological dt
+
+  update->dt = biodt;
+  reset_dt();
+
+  // update reactor attributes
+
+  for (int i = 0; i < nfix_reactor; i++) {
+    fix_reactor[i]->compute();
+  }
 }
 
 /* ---------------------------------------------------------------------- */

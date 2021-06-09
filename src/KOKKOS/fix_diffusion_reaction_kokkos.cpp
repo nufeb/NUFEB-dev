@@ -93,7 +93,7 @@ double FixDiffusionReactionKokkos<DeviceType>::compute_scalar()
     Kokkos::RangePolicy<
     DeviceType,
     FixDiffusionReactionScalarTag>(0, grid->ncells), f, Kokkos::Max<double>(result));
-  DeviceType::fence();
+  DeviceType().fence();
   copymode = 0;
 
   MPI_Allreduce(MPI_IN_PLACE, &result, 1, MPI_DOUBLE, MPI_MAX, world);
@@ -184,7 +184,7 @@ void FixDiffusionReactionKokkos<DeviceType>::closed_system_init()
       if (!(d_mask(i) & GHOST_MASK))
 	sum += d_conc(isub, i);
     }, result);
-  DeviceType::fence();
+  DeviceType().fence();
 
   MPI_Allreduce(MPI_IN_PLACE, &result, 1, MPI_DOUBLE, MPI_SUM, world);
 

@@ -27,7 +27,7 @@ using namespace FixConst;
 FixPropertyGeneration::FixPropertyGeneration(LAMMPS *lmp, int narg, char **arg) :
   FixProperty(lmp, narg, arg)
 {
-  if (narg < 3) error->all(FLERR,"Illegal fix property/nufeb/generation command");
+  if (narg < 3) error->all(FLERR,"Illegal fix nufeb/property/generation command");
 
   create_attribute = 1;
   // use vprop if size_peratom_cols = 0
