@@ -1,0 +1,9 @@
+#!/bin/bash
+# Begin LSF directives
+#BSUB -P ENG107
+#BSUB -W 00:30
+#BSUB -nnodes2
+#BSUB -J nufeb
+
+date
+jsrun -n 2 -a 32 -c 32 $HOME/NUFEB-dev/src/lmp_kokkos_mpi_only_summit -k on -sf kk -pk kokkos newton off neigh half binsize 2e-6 -in Inputscript.lmp
