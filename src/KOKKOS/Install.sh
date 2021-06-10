@@ -131,6 +131,8 @@ action fix_monod_nob_kokkos.cpp fix_monod_nob.cpp
 action fix_monod_nob_kokkos.h fix_monod_nob.h
 action fix_monod_cyano_kokkos.cpp fix_monod_cyano.cpp
 action fix_monod_cyano_kokkos.h fix_monod_cyano.h
+action fix_monod_ecoli_wild_kokkos.cpp fix_monod_ecoli_wild.cpp
+action fix_monod_ecoli_wild_kokkos.h fix_monod_ecoli_wild.h
 action fix_neigh_history_kokkos.cpp
 action fix_neigh_history_kokkos.h
 action fix_nh_kokkos.cpp

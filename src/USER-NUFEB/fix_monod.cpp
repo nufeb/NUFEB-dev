@@ -131,10 +131,8 @@ void FixMonod::update_atoms_coccus()
       const double density = rmass[i] /
     (four_thirds_pi * radius[i] * radius[i] * radius[i]);
       double growth = grid->growth[igroup][cell][0];
-      double ratio = rmass[i] / biomass[i];
-      // forward Euler to update biomass and rmass
-      biomass[i] = biomass[i] * (1 + growth * dt);
-      rmass[i] = rmass[i] * (1 + growth * dt * ratio);
+      // forward Euler to update rmass
+      rmass[i] = rmass[i] * (1 + growth * dt);
       radius[i] = pow(three_quarters_pi * (rmass[i] / density), third);
       outer_mass[i] = 0;
       outer_radius[i] = radius[i];
@@ -166,10 +164,8 @@ void FixMonod::update_atoms_bacillus(AtomVecBacillus *&avec)
       const int cell = grid->cell(x[i]);
       const double density = rmass[i] /	(vsphere + acircle * bonus->length);
       double growth = grid->growth[igroup][cell][0];
-      double ratio = rmass[i] / biomass[i];
-      // forward Eular to update biomass and rmass
-      biomass[i] = biomass[i] * (1 + growth * dt);
-      rmass[i] = rmass[i] * (1 + growth * dt * ratio);
+      // forward Eular to update rmass
+      rmass[i] = rmass[i] * (1 + growth * dt);
       new_length = (rmass[i] - density * vsphere) / (density * acircle);
       bonus->length = new_length;
       // update coordinates of two poles

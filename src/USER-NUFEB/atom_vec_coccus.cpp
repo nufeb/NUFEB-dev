@@ -886,7 +886,7 @@ void AtomVecCoccus::create_atom(int itype, double *coord)
 
   radius[nlocal] = 0.5;
   rmass[nlocal] = 4.0*MY_PI/3.0 * radius[nlocal]*radius[nlocal]*radius[nlocal];
-  biomass[nlocal] = rmass[nlocal];
+  biomass[nlocal] = 1.0;
   omega[nlocal][0] = 0.0;
   omega[nlocal][1] = 0.0;
   omega[nlocal][2] = 0.0;
@@ -950,7 +950,7 @@ void AtomVecCoccus::data_atom(double *coord, imageint imagetmp, char **values)
   double ratio = atof(values[8]);
   if (ratio < 0 || ratio > 1)
     error->one(FLERR,"Biomass/Mass (dry/wet weight) ratio must be between 0-1");
-  biomass[nlocal] = rmass[nlocal] * ratio;
+  biomass[nlocal] = ratio;
 
   atom->nlocal++;
 }
@@ -988,7 +988,7 @@ int AtomVecCoccus::data_atom_hybrid(int nlocal, char **values)
   if (ratio < 0 || ratio > 1)
     error->one(FLERR,"Invalid biomass/Mass ratio in Atoms section of data file:"
 	"ratio < 0 or ratio > 1");
-  biomass[nlocal] = rmass[nlocal] * ratio;
+  biomass[nlocal] = ratio;
 
   return 4;
 }
@@ -1054,7 +1054,7 @@ int AtomVecCoccus::pack_data_hybrid(int i, double *buf)
   if (radius[i] == 0.0) buf[1] = rmass[i];
   else buf[1] = rmass[i] / (4.0*MY_PI/3.0 * radius[i]*radius[i]*radius[i]);
   buf[2] = outer_radius[i];
-  buf[3] = biomass[i] / rmass[i];
+  buf[3] = biomass[i];
   return 4;
 }
 

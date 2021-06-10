@@ -111,7 +111,7 @@ void FixDivideBacillusMinicell::compute()
       // normal division
       if (prob_mini > prob) {
         imass = atom->rmass[i]/2;
-        ibiomass = atom->biomass[i]/2;
+        ibiomass = atom->biomass[i];
         jmass = imass;
         jbiomass = ibiomass;
         // conserve mass
@@ -156,9 +156,9 @@ void FixDivideBacillusMinicell::compute()
 	double idl, jdl, pole1[3];
 
 	jmass = vsphere * density;
-        jbiomass = atom->biomass[i] * jmass / atom->rmass[i];
         imass = atom->rmass[i] - jmass;
-        ibiomass = atom->biomass[i] - jbiomass;
+        ibiomass = atom->biomass[i];
+        jbiomass = ibiomass;
         ilen = (imass / density - vsphere) / acircle;
         idl = ilen / old_len;
 	jdl = (ilen + 2*atom->radius[i]) / old_len;

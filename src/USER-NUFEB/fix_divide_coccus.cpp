@@ -73,8 +73,8 @@ void FixDivideCoccus::compute()
         double imass = atom->rmass[i] * split;
         double jmass = atom->rmass[i] - imass;
 
-        double ibiomass = atom->biomass[i] * split;
-        double jbiomass = atom->biomass[i] - ibiomass;
+        double ibiomass = atom->biomass[i];
+        double jbiomass = atom->biomass[i];
 
         double iouter_mass = atom->outer_mass[i] * split;
         double jouter_mass = atom->outer_mass[i] - iouter_mass;

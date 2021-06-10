@@ -1430,7 +1430,7 @@ void AtomVecBacillus::data_atom_bonus(int m, char **values)
   rmass[m] *= (4.0*MY_PI/3.0*
       atom->radius[m]*atom->radius[m]*atom->radius[m] +
       MY_PI*atom->radius[m]*atom->radius[m]*bonus[nlocal_bonus].length);
-  biomass[m] = rmass[m] * biomass[m];
+  biomass[m] = 1.0;
 
   bonus[nlocal_bonus].ilocal = m;
   bacillus[m] = nlocal_bonus++;
@@ -1481,7 +1481,7 @@ void AtomVecBacillus::pack_data(double **buf)
     buf[i][4] = x[i][0];
     buf[i][5] = x[i][1];
     buf[i][6] = x[i][2];
-    buf[i][7] = biomass[i] / rmass[i];
+    buf[i][7] = biomass[i];
     buf[i][8] = ubuf((image[i] & IMGMASK) - IMGMAX).d;
     buf[i][9] = ubuf((image[i] >> IMGBITS & IMGMASK) - IMGMAX).d;
     buf[i][10] = ubuf((image[i] >> IMG2BITS) - IMGMAX).d;
@@ -1501,7 +1501,7 @@ int AtomVecBacillus::pack_data_hybrid(int i, double *buf)
       atom->radius[i]*atom->radius[i]*atom->radius[i] +
       MY_PI*atom->radius[i]*atom->radius[i]*bonus[bacillus[i]].length);
 
-  buf[2] = biomass[i] / rmass[i];
+  buf[2] = biomass[i];
 
   return 3;
 }

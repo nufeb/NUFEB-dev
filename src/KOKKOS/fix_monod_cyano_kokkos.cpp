@@ -89,7 +89,6 @@ void FixMonodCyanoKokkos<DeviceType>::update_atoms()
   double **x = atom->x;
   double *radius = atom->radius;
   double *rmass = atom->rmass;
-  double *biomass = atom->biomass;
   double *outer_radius = atom->outer_radius;
   double *outer_mass = atom->outer_mass;
   double ***growth = grid->growth;
@@ -105,10 +104,8 @@ void FixMonodCyanoKokkos<DeviceType>::update_atoms()
       const int cell = grid->cell(x[i]);
       const double density = rmass[i] /
 	(four_thirds_pi * radius[i] * radius[i] * radius[i]);
-      double ratio = rmass[i] / biomass[i];
 
-      rmass[i] = rmass[i] * (1 + growth[igroup][cell][0] * dt * ratio);
-      biomass[i] = biomass[i] * (1 + growth[igroup][cell][0] * dt);
+      rmass[i] = rmass[i] * (1 + growth[igroup][cell][0] * dt);
       radius[i] = pow(three_quarters_pi * (rmass[i] / density), third);
       outer_mass[i] = 0;
       outer_radius[i] = radius[i];

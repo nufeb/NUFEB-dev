@@ -53,6 +53,7 @@ class FixDensityKokkos : public FixDensity {
   typename AT::t_int_1d d_mask;
   typename AT::t_x_array d_x;
   typename AT::t_float_1d d_biomass;
+  typename AT::t_float_1d d_rmass;
   typename AT::t_float_2d d_dens;
 };
 

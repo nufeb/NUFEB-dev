@@ -115,10 +115,7 @@ if (test $cmd = "style") || (test $cmd = "packages") then
   $cmd PAIR_CLASS      pair_       pair       force
   $cmd READER_CLASS    reader_     reader     read_dump
   $cmd REGION_CLASS    region_     region     domain
-
-  # NUFEB specific
-
-  style GRID_CLASS      grid_vec_   grid       grid
+  $cmd GRID_CLASS      grid_vec_   grid       grid
   
 # edit Makefile.lib, for creating non-shared lib
 # called by "make makelib"

@@ -89,7 +89,7 @@ void FixDivideBacillus::compute()
 	double old_len = bonus->length;
 
         imass = atom->rmass[i]/2;
-        ibiomass = atom->biomass[i]/2;
+        ibiomass = atom->biomass[i];
 
         // conserve mass
         ilen = (imass / density - vsphere) / acircle;
