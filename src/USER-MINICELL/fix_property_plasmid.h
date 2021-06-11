@@ -37,7 +37,7 @@ class FixPropertyPlasmid : public FixProperty {
   double compute_scalar();
 
  private:
-  double replication;
+  double replicate;
   int seed;
 
   class RanPark *random;

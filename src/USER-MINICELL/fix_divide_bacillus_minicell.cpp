@@ -18,7 +18,6 @@
 #include <string.h>
 #include "atom.h"
 #include "atom_vec.h"
-#include "atom_vec_bacillus.h"
 #include "error.h"
 #include "lmptype.h"
 #include "math_const.h"
@@ -27,6 +26,7 @@
 #include "modify.h"
 #include "domain.h"
 #include "atom_masks.h"
+#include "atom_vec_bacillus_ecoli.h"
 #include "random_park.h"
 
 #include "comm.h"
@@ -88,7 +88,7 @@ void FixDivideBacillusMinicell::compute()
 
       if (bonus->length < maxlength) continue;
 
-      double imass, jmass, ibiomass, jbiomass;
+      double imass, jmass;
       double ilen, jlen, xp1[3], xp2[3];
       int j;
 
@@ -110,9 +110,7 @@ void FixDivideBacillusMinicell::compute()
       // normal division
       if (prob_mini > prob) {
         imass = atom->rmass[i]/2;
-        ibiomass = atom->biomass[i]/2;
         jmass = imass;
-        jbiomass = ibiomass;
         // conserve mass
         ilen = (imass / density - vsphere) / acircle;;
 
@@ -123,7 +121,6 @@ void FixDivideBacillusMinicell::compute()
 	atom->x[i][2] += (xp1[2] - oldz) * dl;
 
         atom->rmass[i] = imass;
-        atom->biomass[i] = ibiomass;
 
         bonus->pole1[0] *= ilen / old_len;
         bonus->pole1[1] *= ilen / old_len;
@@ -155,15 +152,13 @@ void FixDivideBacillusMinicell::compute()
 	double idl, jdl, pole1[3];
 
 	jmass = vsphere * density;
-        jbiomass = atom->biomass[i] * jmass / atom->rmass[i];
         imass = atom->rmass[i] - jmass;
-        ibiomass = atom->biomass[i] - jbiomass;
+
         ilen = (imass / density - vsphere) / acircle;
         idl = ilen / old_len;
 	jdl = (ilen + 2*atom->radius[i]) / old_len;
 
 	atom->rmass[i] = imass;
-	atom->biomass[i] = ibiomass;
 	bonus->length = ilen;
 	bonus->pole1[0] *= ilen / old_len;
 	bonus->pole1[1] *= ilen / old_len;
@@ -217,7 +212,7 @@ void FixDivideBacillusMinicell::compute()
       atom->angmom[j][1] = atom->angmom[i][1];
       atom->angmom[j][2] = atom->angmom[i][2];
       atom->rmass[j] = jmass;
-      atom->biomass[j] = jbiomass;
+      atom->biomass[j] = atom->biomass[i];
       atom->radius[j] = atom->radius[i];
 
       modify->create_attribute(j);
