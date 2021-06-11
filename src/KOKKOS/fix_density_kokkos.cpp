@@ -32,7 +32,7 @@ FixDensityKokkos<DeviceType>::FixDensityKokkos(LAMMPS *lmp, int narg, char **arg
   atomKK = (AtomKokkos *)atom;
   execution_space = ExecutionSpaceFromDevice<DeviceType>::space;
 
-  datamask_read = X_MASK | MASK_MASK | BIOMASS_MASK;
+  datamask_read = X_MASK | MASK_MASK | BIOMASS_MASK | RMASS_MASK;
   datamask_modify = 0;
 }
 
@@ -75,6 +75,7 @@ void FixDensityKokkos<DeviceType>::compute()
   d_mask = atomKK->k_mask.view<DeviceType>();
   d_x = atomKK->k_x.view<DeviceType>();
   d_biomass = atomKK->k_biomass.template view<DeviceType>();
+  d_rmass = atomKK->k_rmass.template view<DeviceType>();
   d_dens = gridKK->k_dens.template view<DeviceType>();
 
   copymode = 1;
@@ -110,7 +111,7 @@ void FixDensityKokkos<DeviceType>::compute()
 			   int cell = c[0] + c[1] * grid_subbox[0] +
 			     c[2] * grid_subbox[0] * grid_subbox[1];
 
-			   double d = d_biomass(i) / vol;
+			   double d = d_biomass(i) * d_biomass(i) / vol;
 			   a_dens(0,cell) += d;
 			   for (int igroup = 0; igroup < ngroup; igroup++)
 			     if (d_mask(i) & d_bitmask(igroup))

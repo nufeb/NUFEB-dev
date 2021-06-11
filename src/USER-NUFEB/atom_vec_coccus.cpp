@@ -53,7 +53,7 @@ AtomVecCoccus::AtomVecCoccus(LAMMPS *lmp) : AtomVec(lmp)
   fields_exchange = (char *) "radius rmass omega outer_mass outer_radius biomass";
   fields_restart = (char *) "radius rmass omega outer_mass outer_radius biomass";
   fields_create = (char *) "radius rmass omega outer_mass outer_radius biomass";
-  fields_data_atom = (char *) "id type radius rmass x outer_radius biomass";
+  fields_data_atom = (char *) "id type radius rmass x outer_radius";
   fields_data_vel = (char *) "id v omega";
 }
 
@@ -134,7 +134,7 @@ void AtomVecCoccus::create_atom_post(int ilocal)
 {
   radius[ilocal] = 0.5e-6;
   rmass[ilocal] = 4.0*MY_PI/3.0 * 0.5e-6*0.5e-6*0.5e-6;
-  biomass[ilocal] = rmass[ilocal];
+  biomass[ilocal] = 1.0;
   outer_radius[ilocal] = radius[ilocal];
   outer_mass[ilocal] = 0;
 }
@@ -168,10 +168,7 @@ void AtomVecCoccus::data_atom_post(int ilocal)
     ((outer_radius[ilocal]*outer_radius[ilocal]*outer_radius[ilocal])
      -(radius[ilocal]*radius[ilocal]*radius[ilocal])) * 30;
 
-  biomass_one = atom->biomass[ilocal];
-  if (biomass_one < 0 || biomass_one > 1)
-    error->one(FLERR,"Biomass/Mass (dry/wet weight) ratio must be between 0-1");
-  biomass[ilocal] = biomass_one*rmass[ilocal];
+  biomass[ilocal] = 1.0;
 }
 
 
@@ -191,9 +188,6 @@ void AtomVecCoccus::pack_data_pre(int ilocal)
 
   outer_radius_one = outer_radius[ilocal];
   outer_radius[ilocal] *= 2.0;
-
-  biomass_one = biomass[ilocal];
-  biomass[ilocal] = biomass_one/rmass_one;
 }
 
 /* ----------------------------------------------------------------------
@@ -205,5 +199,5 @@ void AtomVecCoccus::pack_data_post(int ilocal)
   radius[ilocal] = radius_one;
   rmass[ilocal] = rmass_one;
   outer_radius[ilocal] = outer_radius_one;
-  biomass[ilocal] = biomass_one;
+  biomass[ilocal] = 1.0;
 }

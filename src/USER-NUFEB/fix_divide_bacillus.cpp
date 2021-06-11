@@ -73,7 +73,7 @@ void FixDivideBacillus::compute()
       AtomVecBacillus::Bonus *bonus = &avec->bonus[ibonus];
 
       if (bonus->length >= maxlength) {
-	double imass, ibiomass;
+	double imass;
 	double ilen, xp1[3], xp2[3];
 
 //	double phiz = random->uniform() * 2e-8;
@@ -88,7 +88,6 @@ void FixDivideBacillus::compute()
 	double old_len = bonus->length;
 
         imass = atom->rmass[i]/2;
-        ibiomass = atom->biomass[i]/2;
 
         // conserve mass
         ilen = (imass / density - vsphere) / acircle;
@@ -105,7 +104,6 @@ void FixDivideBacillus::compute()
 	atom->x[i][2] += (xp1[2] - oldz) * dl;
 
         atom->rmass[i] = imass;
-        atom->biomass[i] = ibiomass;
 
         bonus->pole1[0] *= ilen / old_len;
         bonus->pole1[1] *= ilen / old_len;
@@ -143,7 +141,7 @@ void FixDivideBacillus::compute()
 	atom->angmom[j][1] = atom->angmom[i][1];
 	atom->angmom[j][2] = atom->angmom[i][2];
         atom->rmass[j] = imass;
-        atom->biomass[j] = ibiomass;
+        atom->biomass[j] = atom->biomass[i];
         atom->radius[j] = atom->radius[i];
 
         modify->create_attribute(j);

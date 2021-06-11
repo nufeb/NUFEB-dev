@@ -63,15 +63,15 @@ AtomVecBacillus::AtomVecBacillus(LAMMPS *lmp) : AtomVec(lmp)
 
   fields_grow = (char *) "radius rmass angmom torque bacillus biomass";
   fields_copy = (char *) "radius rmass angmom biomass";
-  fields_comm = (char *) "rmass biomass";
-  fields_comm_vel = (char *) "angmom rmass biomass";
+  fields_comm = (char *) "rmass";
+  fields_comm_vel = (char *) "angmom rmass";
   fields_reverse = (char *) "torque";
   fields_border = (char *) "radius rmass biomass";
   fields_border_vel = (char *) "radius rmass angmom biomass";
   fields_exchange = (char *) "radius rmass angmom biomass";
   fields_restart = (char *) "radius rmass angmom biomass";
   fields_create = (char *) "radius rmass angmom bacillus biomass";
-  fields_data_atom = (char *) "id type bacillus rmass x biomass";
+  fields_data_atom = (char *) "id type bacillus rmass x";
   fields_data_vel = (char *) "id v angmom";
 }
 
@@ -102,8 +102,8 @@ void AtomVecBacillus::process_args(int narg, char **arg)
   // dynamic particle properties must be communicated every step
 
   if (radvary) {
-    fields_comm = (char *) "radius rmass biomass";
-    fields_comm_vel = (char *) "radius rmass angmom biomass";
+    fields_comm = (char *) "radius rmass";
+    fields_comm_vel = (char *) "radius rmass angmom";
   }
 
   // delay setting up of fields until now
@@ -581,9 +581,7 @@ void AtomVecBacillus::data_atom_bonus(int m, char **values)
   rmass[m] *= (4.0*MY_PI/3.0*radius[m]*radius[m]*radius[m] +
       MY_PI*radius[m]*radius[m]*bonus[nlocal_bonus].length);
 
-  if (biomass[m] < 0 || biomass[m] > 1)
-    error->one(FLERR,"Biomass/Mass (dry/wet weight) ratio must be between 0-1");
-  biomass[m] *= rmass[m];
+  biomass[m] = 1.0;
 
   bonus[nlocal_bonus].ilocal = m;
   bacillus[m] = nlocal_bonus++;
@@ -611,7 +609,7 @@ void AtomVecBacillus::create_atom_post(int ilocal)
   rmass[ilocal] *= (4.0*MY_PI/3.0*
       radius[ilocal]*radius[ilocal]*radius[ilocal] +
       MY_PI*radius[ilocal]*radius[ilocal]*bonus[nlocal_bonus].length);
-  biomass[ilocal] = rmass[ilocal];
+  biomass[ilocal] = 1.0;
   bacillus[ilocal] = -1;
 }
 
@@ -651,9 +649,6 @@ void AtomVecBacillus::pack_data_pre(int ilocal)
   if (bacillus_flag >= 0)
     rmass[ilocal] /= (4.0*MY_PI/3.0*radius[ilocal]*radius[ilocal]*radius[ilocal] +
 	      MY_PI*radius[ilocal]*radius[ilocal]*bonus[bacillus[ilocal]].length);
-
-  biomass_one = biomass[ilocal];
-  biomass[ilocal] /= rmass_one;
 }
 
 /* ----------------------------------------------------------------------
@@ -664,7 +659,7 @@ void AtomVecBacillus::pack_data_post(int ilocal)
 {
   bacillus[ilocal] = bacillus_flag;
   rmass[ilocal] = rmass_one;
-  biomass[ilocal] = biomass_one;
+  biomass[ilocal] = 1.0;
 }
 
 /* ----------------------------------------------------------------------

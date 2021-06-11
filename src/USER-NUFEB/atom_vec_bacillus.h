@@ -82,7 +82,7 @@ class AtomVecBacillus : public AtomVec {
   int bacillus_flag;
 
   int radvary;
-  double rmass_one, biomass_one;
+  double rmass_one;
 
   void grow_bonus();
   void copy_bonus_all(int, int);

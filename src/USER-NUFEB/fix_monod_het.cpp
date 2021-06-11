@@ -172,10 +172,8 @@ void FixMonodHET::update_atoms()
       const int cell = grid->cell(x[i]);
       const double density = rmass[i] /
 	(four_thirds_pi * radius[i] * radius[i] * radius[i]);
-      double ratio = rmass[i] / biomass[i];
       // forward Euler to update biomass and rmass
-      biomass[i] = biomass[i] * (1 + growth[igroup][cell][0] * dt);
-      rmass[i] = rmass[i] * (1 + growth[igroup][cell][0] * dt * ratio);
+      rmass[i] = rmass[i] * (1 + growth[igroup][cell][0] * dt);
       outer_mass[i] = four_thirds_pi *
 	(outer_radius[i] * outer_radius[i] * outer_radius[i] -
 	 radius[i] * radius[i] * radius[i]) *

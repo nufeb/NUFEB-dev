@@ -72,9 +72,6 @@ void FixDivideCoccus::compute()
         double imass = atom->rmass[i] * split;
         double jmass = atom->rmass[i] - imass;
 
-        double ibiomass = atom->biomass[i] * split;
-        double jbiomass = atom->biomass[i] - ibiomass;
-
         double iouter_mass = atom->outer_mass[i] * split;
         double jouter_mass = atom->outer_mass[i] - iouter_mass;
 
@@ -87,7 +84,6 @@ void FixDivideCoccus::compute()
 
         // update daughter cell i
         atom->rmass[i] = imass;
-        atom->biomass[i] = ibiomass;
         atom->outer_mass[i] = iouter_mass;
         atom->radius[i] = pow(((6 * atom->rmass[i]) / (density * MY_PI)), (1.0 / 3.0)) * 0.5;
         atom->outer_radius[i] = pow((3.0 / (4.0 * MY_PI)) * ((atom->rmass[i] / density) + (iouter_mass / eps_density)), (1.0 / 3.0));
@@ -157,7 +153,7 @@ void FixDivideCoccus::compute()
 	atom->torque[j][1] = atom->torque[i][1];
 	atom->torque[j][2] = atom->torque[i][2];
         atom->rmass[j] = jmass;
-        atom->biomass[j] = jbiomass;
+        atom->biomass[j] = atom->biomass[i];
         atom->radius[j] = jradius;
         atom->outer_mass[j] = jouter_mass;
         atom->outer_radius[j] = jouter_radius;

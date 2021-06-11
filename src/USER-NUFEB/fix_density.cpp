@@ -93,7 +93,7 @@ void FixDensity::compute()
 	atom->x[i][1] >= domain->sublo[1] && atom->x[i][1] < domain->subhi[1] &&
 	atom->x[i][2] >= domain->sublo[2] && atom->x[i][2] < domain->subhi[2]) {
       int cell = grid->cell(atom->x[i]);
-      double d = atom->biomass[i] / vol;
+      double d = atom->biomass[i] * atom->rmass[i] / vol;
       grid->dens[0][cell] += d;
       for (int igroup = 0; igroup < group->ngroup; igroup++)
 	if (atom->mask[i] & group->bitmask[igroup])

@@ -183,7 +183,7 @@ void FixEPSExtract::compute()
 	atom->torque[n][1] = atom->torque[i][1];
 	atom->torque[n][2] = atom->torque[i][2];
         atom->rmass[n] = eps_mass;
-        atom->biomass[n] = eps_mass;
+        atom->biomass[n] = 1.0;
         atom->radius[n] = child_radius;
         atom->outer_mass[n] = 0;
         atom->outer_radius[n] = child_radius;

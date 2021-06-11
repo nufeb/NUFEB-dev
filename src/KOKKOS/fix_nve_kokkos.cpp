@@ -35,17 +35,6 @@ FixNVEKokkos<DeviceType>::FixNVEKokkos(LAMMPS *lmp, int narg, char **arg) :
   datamask_modify = X_MASK | V_MASK;
 }
 
-/* ---------------------------------------------------------------------- */
-
-template<class DeviceType>
-void FixNVEKokkos<DeviceType>::init()
-{
-  FixNVE::init();
-
-  atomKK->k_mass.modify<LMPHostType>();
-  atomKK->k_mass.sync<DeviceType>();
-}
-
 /* ----------------------------------------------------------------------
    allow for both per-type and per-atom mass
 ------------------------------------------------------------------------- */
@@ -129,9 +118,6 @@ void FixNVEKokkos<DeviceType>::final_integrate()
     FixNVEKokkosFinalIntegrateFunctor<DeviceType,0> functor(this);
     Kokkos::parallel_for(nlocal,functor);
   }
-
-  // debug
-  //atomKK->sync(Host,datamask_read);
 }
 
 template<class DeviceType>

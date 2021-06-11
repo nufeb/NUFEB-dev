@@ -43,7 +43,7 @@ class AtomVecCoccus : public AtomVec {
 
   int radvary;
   double radius_one,rmass_one;
-  double outer_radius_one, biomass_one;
+  double outer_radius_one;
 };
 
 }
