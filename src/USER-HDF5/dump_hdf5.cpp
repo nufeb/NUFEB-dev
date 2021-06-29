@@ -259,6 +259,28 @@ void DumpHDF5::write() {
 	delete reac;
       }
       H5Gclose(group);
+    } else if (*it == "grow") {
+      hid_t group;
+      if (multifile)
+	group = H5Gcreate(file, "growth", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      else
+	group = H5Gopen(file, "growth", H5P_DEFAULT);
+      for (int i = 0; i < grid->nsubs; i++) {
+	std::ostringstream oss;
+	oss << "growth/" << grid->sub_names[i];
+	double *grow = new double[ncells];
+	trim_grids(grid->growth[i][0], grow);
+	if (multifile) {
+	  write_grid(file, oss.str().c_str(), H5T_NATIVE_DOUBLE, grow, oneperproc);
+	} else {
+	  hid_t subgroup = H5Gopen(file, oss.str().c_str(), H5P_DEFAULT);
+	  oss <<"/" << std::to_string(update->ntimestep);
+	  write_grid(file, oss.str().c_str(), H5T_NATIVE_DOUBLE, grow, oneperproc);
+	  H5Gclose(subgroup);
+	}
+	delete grow;
+      }
+      H5Gclose(group);
     }
   }
   H5Fclose(file);
@@ -340,6 +362,15 @@ void DumpHDF5::create_one_file() {
 	H5Gclose(group);
       }
       H5Gclose(group);
+    } else if (*it == "grow") {
+      hid_t group = H5Gcreate(file, "growth", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+      for (int i = 0; i < grid->nsubs; i++) {
+	std::ostringstream oss;
+	oss << "growth/" << grid->sub_names[i];
+	hid_t group = H5Gcreate(file, oss.str().c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	H5Gclose(group);
+      }
+      H5Gclose(group);
     }
   }
   H5Fclose(file);
@@ -376,6 +407,8 @@ int DumpHDF5::parse_fields(int narg, char **arg) {
     } else if (strcmp(arg[iarg], "conc") == 0) {
       fields.push_back(arg[iarg]);
     } else if (strcmp(arg[iarg], "reac") == 0) {
+      fields.push_back(arg[iarg]);
+    } else if (strcmp(arg[iarg], "grow") == 0) {
       fields.push_back(arg[iarg]);
     }
   }

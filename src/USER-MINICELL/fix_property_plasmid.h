@@ -21,6 +21,7 @@ FixStyle(nufeb/property/plasmid,FixPropertyPlasmid)
 #define LMP_FIX_PROPERTY_PLASMID_H
 
 #include "fix_property.h"
+#include "atom_vec_bacillus.h"
 
 namespace LAMMPS_NS {
 
@@ -28,16 +29,46 @@ class FixPropertyPlasmid : public FixProperty {
  public:
 
   FixPropertyPlasmid(class LAMMPS *, int, char **);
-  ~FixPropertyPlasmid() {};
+  ~FixPropertyPlasmid();
 
+  void grow_arrays(int);
   void init();
   void set_arrays(int) {};
   void update_arrays(int, int);
   void compute();
   double compute_scalar();
 
+  void get_plasmid_coords(int, int, double *, double *);
+  double get_plasmid_diameter() {return dia;};
+  void delte_plasmid(int);
+  void create_plasmid();
+
+  double memory_usage();
+  void copy_arrays(int, int, int);
+  void copy_plasmid(int, int, int, int);
+  int pack_exchange(int, double *);
+  int unpack_exchange(int, double *);
+  int pack_restart(int, double *);
+  void unpack_restart(int, int);
+  int size_restart(int);
+  int maxsize_restart();
+
+ protected:
+  double **xpm;
+  double **vpm;
+  double **xold;
+  double **reac_t;
+  int **filament;
+
  private:
-  double replication;
+  void replication(int);
+  void motility(int);
+  void get_xlimit(double *, int, int);
+  void set_plasmid_xpm(int, int, double *,double *);
+
+  double replicate, dia, acc, dt;
+  double dtsq;
+  int pmax, pinit;
   int seed;
 
   class RanPark *random;

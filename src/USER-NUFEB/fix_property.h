@@ -22,6 +22,9 @@ class FixProperty : public Fix {
  public:
   int compute_flag;
 
+  double **aprop;
+  double *vprop;
+
   FixProperty(class LAMMPS *, int, char **);
   ~FixProperty();
 
@@ -42,10 +45,6 @@ class FixProperty : public Fix {
   int size_restart(int);
   int maxsize_restart();
   double memory_usage();
-
- protected:
-  double **aprop;
-  double *vprop;
 };
 
 }

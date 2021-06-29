@@ -23,6 +23,7 @@
 #include "atom_vec_tri.h"
 #include "atom_vec_body.h"
 #include "atom_vec_bacillus.h"
+#include "fix_property_plasmid.h"
 #include "body.h"
 #include "molecule.h"
 #include "domain.h"
@@ -118,6 +119,7 @@ DumpImage::DumpImage(LAMMPS *lmp, int narg, char **arg) :
 
   atomflag = YES;
   lineflag = triflag = bodyflag = bacillusflag = fixflag = NO;
+  plasmidflag = NO;
   if (atom->nbondtypes == 0) bondflag = NO;
   else {
     bondflag = YES;
@@ -209,8 +211,12 @@ DumpImage::DumpImage(LAMMPS *lmp, int narg, char **arg) :
       bacillusflag = YES;
       if (strcmp(arg[iarg+1],"type") == 0) bacilluscolor = TYPE;
       else error->all(FLERR,"Illegal dump image command");
-      iarg += 2;
-
+      if (strcmp(arg[iarg+2],"plasmid") == 0) {
+	if (strcmp(arg[iarg+3], "yes") == 0) plasmidflag = 1;
+	else if (strcmp(arg[iarg+3], "no") == 0) plasmidflag = 0;
+	else error->all(FLERR,"Illegal dump image command");
+      } else error->all(FLERR,"Illegal dump image command");
+      iarg += 4;
     } else if (strcmp(arg[iarg],"fix") == 0) {
       if (iarg+5 > narg) error->all(FLERR,"Illegal dump image command");
       fixflag = YES;
@@ -851,10 +857,25 @@ void DumpImage::create_image()
 
       diameter = avec_bacillus->bonus[bacillus[j]].diameter;
 
-      if (avec_bacillus->bonus[bacillus[j]].length == 0) { // spheres
-	image->draw_sphere(x[j],color,diameter);
-      } else { // rods
-	image->draw_cylinder(xp1,xp2,color,diameter,3);
+      if (!plasmidflag){
+	if (avec_bacillus->bonus[bacillus[j]].length == 0) { // spheres
+	  image->draw_sphere(x[j],color,diameter);
+	} else { // rods
+	  image->draw_cylinder(xp1,xp2,color,diameter,3);
+	}
+      } else{
+	FixPropertyPlasmid *fix = nullptr;;
+	for (int k = 0; k < modify->nfix; k++)
+	  if (strcmp(modify->fix[k]->style,"nufeb/property/plasmid") == 0) {
+	    fix = (FixPropertyPlasmid *) modify->fix[k];
+	    break;
+	  }
+	if (fix == nullptr) error->all(FLERR,"Illegal dump_modify command: keyword plasmid requires fix nufeb/property/plasmid");
+	double xplasmid[3];
+	for (int k = 0; k < (int)fix->vprop[j]; k++) {
+	  fix->get_plasmid_coords(j,k,xplasmid,x[j]);
+	  image->draw_sphere(xplasmid,image->color2rgb("green"),fix->get_plasmid_diameter());
+	}
       }
     }
   }

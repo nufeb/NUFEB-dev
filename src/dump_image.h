@@ -51,6 +51,7 @@ class DumpImage : public DumpCustom {
   int bodycolor;                   // what determines color of bodies
   double bodyflag1,bodyflag2;      // user-specified params for drawing bodies
   int bacillusflag;
+  int plasmidflag;
   int bacilluscolor;
   int fixflag;                     // 0/1 to draw what fix provides
   int fixcolor;                    // what determines color of fix objects
