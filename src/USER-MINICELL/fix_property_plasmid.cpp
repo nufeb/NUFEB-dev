@@ -20,10 +20,11 @@
 #include "force.h"
 #include "memory.h"
 #include "error.h"
+
+#include "atom_vec_bacillus_ecoli.h"
 #include "update.h"
 #include "math_const.h"
 #include "random_park.h"
-#include "atom_vec_bacillus.h"
 
 using namespace LAMMPS_NS;
 using namespace MathConst;
@@ -46,6 +47,7 @@ FixPropertyPlasmid::FixPropertyPlasmid(LAMMPS *lmp, int narg, char **arg) :
 
   compute_flag = 1;
   scalar_flag = 1;
+
   replicate = 0.0;
   pmax = 5;
   pinit = 0;
@@ -54,6 +56,7 @@ FixPropertyPlasmid::FixPropertyPlasmid(LAMMPS *lmp, int narg, char **arg) :
   dt = 1;
 
   seed = utils::inumeric(FLERR,arg[3],true,lmp);
+
   // Random number generator, same for all procs
   random = new RanPark(lmp, seed);
 
